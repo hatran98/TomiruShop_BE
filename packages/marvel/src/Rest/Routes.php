@@ -357,7 +357,7 @@ Route::group(
         Route::apiResource('shops', ShopController::class, [
             'only' => ['store', 'update', 'destroy'],
         ]);
-        // Route::get('analytics', [AnalyticsController::class, 'analytics']);
+//         Route::get('analytics', [AnalyticsController::class, 'analytics']);
         Route::apiResource('withdraws', WithdrawController::class, [
             'only' => ['store', 'index', 'show'],
         ]);

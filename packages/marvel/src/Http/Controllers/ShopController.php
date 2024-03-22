@@ -52,7 +52,7 @@ class ShopController extends CoreController
     public function fetchShops(Request $request)
     {
         $language = $request->language ?? DEFAULT_LANGUAGE;
-        return $this->repository->withCount(['orders'])->withCount(['products' => function ($query) use ($language) {
+        return $this->repository->withCount(['orders'])->withSum('orders' , 'paid_total') -> withSum('orders','total_tomxu') ->withCount(['products' => function ($query) use ($language) {
             $query->where('language', $language);
         }])->with(['owner.profile'])->where('id', '!=', null);
     }
@@ -90,6 +90,8 @@ class ShopController extends CoreController
         $shop = $this->repository
             ->with(['categories', 'owner'])
             ->withCount(['orders'])
+            ->withSum('orders','paid_total')
+            ->withSum('orders','total_tomxu')
             ->withCount(['products' => function ($query) use ($language) {
                 $query->where('language', $language);
             }]);
@@ -270,11 +272,18 @@ class ShopController extends CoreController
         throw new AuthorizationException(NOT_AUTHORIZED);
     }
 
+
     public function myShops(Request $request)
     {
         $user = $request->user();
-        return $this->repository->where('owner_id', '=', $user->id)->get();
+        $shops = $this->repository
+            ->withSum('orders', 'paid_total')
+            ->withSum('orders', 'total_tomxu')
+            ->where('owner_id', '=', $user->id)
+            ->get();
+        return $shops;
     }
+
 
     public function topShops(Request $request)
     {
@@ -423,10 +432,10 @@ class ShopController extends CoreController
                 ->where('settings->location->lng', '!=', null)
                 ->select(
                     "shops.*",
-                    DB::raw("6371 * acos(cos(radians(" . $lat . ")) 
-        * cos(radians(json_unquote(json_extract(`shops`.`settings`, '$.\"location\".\"lat\"')))) 
-        * cos(radians(json_unquote(json_extract(`shops`.`settings`, '$.\"location\".\"lng\"'))) - radians(" . $lng . ")) 
-        + sin(radians(" . $lat . ")) 
+                    DB::raw("6371 * acos(cos(radians(" . $lat . "))
+        * cos(radians(json_unquote(json_extract(`shops`.`settings`, '$.\"location\".\"lat\"'))))
+        * cos(radians(json_unquote(json_extract(`shops`.`settings`, '$.\"location\".\"lng\"'))) - radians(" . $lng . "))
+        + sin(radians(" . $lat . "))
         * sin(radians(json_unquote(json_extract(`shops`.`settings`, '$.\"location\".\"lat\"'))))) AS distance")
                 )
                 ->orderBy('distance', 'ASC')
