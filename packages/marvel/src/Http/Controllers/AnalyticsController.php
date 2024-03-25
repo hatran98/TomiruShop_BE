@@ -46,14 +46,17 @@ class AnalyticsController extends CoreController
                     'A.id',
                     'A.parent_id',
                     'A.paid_total',
+                    'B.total_tomxu',
                     'B.delivery_fee',
                     'B.sales_tax',
                     'A.created_at',
                     'A.shop_id'
                 );
 
+
             if ($user && $user->hasPermissionTo(Permission::SUPER_ADMIN)) {
                 $dbRevenueQuery = $dbRevenueQuery->get();
+                $totalTomxu = $dbRevenueQuery->sum('total_tomxu') + $dbRevenueQuery->unique('parent_id') ->sum('delivery_fee') +$dbRevenueQuery->unique('parent_id') -> sum('sales_tax');
                 $totalRevenue = $dbRevenueQuery->sum('paid_total') +
                     $dbRevenueQuery->unique('parent_id')->sum('delivery_fee') + $dbRevenueQuery->unique('parent_id')->sum('sales_tax');
             } else {
@@ -61,6 +64,12 @@ class AnalyticsController extends CoreController
                     ->whereIn('A.shop_id', $shops)
                     ->get()
                     ->sum('paid_total');
+                $totalTomxu = $dbRevenueQuery
+                    ->whereIn('A.shop_id', $shops)
+                    ->get()
+                    ->sum('total_tomxu');
+
+
             }
 
             $totalRefundQuery = DB::table('refunds')->whereDate('created_at', '<', Carbon::now());
@@ -80,6 +89,7 @@ class AnalyticsController extends CoreController
                     'A.id',
                     'A.parent_id',
                     'A.paid_total',
+                    'B.total_tomxu',
                     'B.delivery_fee',
                     'B.sales_tax',
                     'A.created_at',
@@ -91,8 +101,11 @@ class AnalyticsController extends CoreController
                 $todaysRevenue =  $todaysRevenueQuery->sum('paid_total') +
                     $todaysRevenueQuery->unique('parent_id')->sum('delivery_fee') +
                     $todaysRevenueQuery->unique('parent_id')->sum('sales_tax');
+                $todaysTomxu = $todaysRevenueQuery->whereIn('A.shop_id', $shops)->get()->sum('total_tomxu');
+
             } else {
                 $todaysRevenue = $todaysRevenueQuery->whereIn('A.shop_id', $shops)->get()->sum('paid_total');
+                $todaysTomxu = $todaysRevenueQuery->whereIn('A.shop_id', $shops)->get()->sum('total_tomxu');
             }
 
             $totalOrdersQuery = DB::table('orders')->whereDate('created_at', '<', Carbon::now());
@@ -121,6 +134,8 @@ class AnalyticsController extends CoreController
 
 
             return [
+                'totalTomxu' => $totalTomxu,
+                'todaysTomxu' => $todaysTomxu,
                 'totalRevenue'              => $totalRevenue,
                 'totalRefunds'              => $totalRefunds ?? 0,
                 'totalShops'                => $totalShops,
