@@ -56,10 +56,9 @@ class AnalyticsController extends CoreController
 
             if ($user && $user->hasPermissionTo(Permission::SUPER_ADMIN)) {
                 $dbRevenueQuery = $dbRevenueQuery->get();
-                $totalTomxu = $dbRevenueQuery->sum('total_tomxu') + $dbRevenueQuery->unique('parent_id') ->sum('delivery_fee') +$dbRevenueQuery->unique('parent_id') -> sum('sales_tax');
                 $totalRevenue = $dbRevenueQuery->sum('paid_total') +
                     $dbRevenueQuery->unique('parent_id')->sum('delivery_fee') + $dbRevenueQuery->unique('parent_id')->sum('sales_tax');
-            } else {
+                $totalTomxu = $dbRevenueQuery->sum('total_tomxu') + $dbRevenueQuery->unique('parent_id')->sum('delivery_fee') + $dbRevenueQuery->unique('parent_id')->sum('sales_tax');            } else {
                 $totalRevenue = $dbRevenueQuery
                     ->whereIn('A.shop_id', $shops)
                     ->get()
@@ -101,8 +100,9 @@ class AnalyticsController extends CoreController
                 $todaysRevenue =  $todaysRevenueQuery->sum('paid_total') +
                     $todaysRevenueQuery->unique('parent_id')->sum('delivery_fee') +
                     $todaysRevenueQuery->unique('parent_id')->sum('sales_tax');
-                $todaysTomxu = $todaysRevenueQuery->whereIn('A.shop_id', $shops)->get()->sum('total_tomxu');
-
+                $todaysTomxu =  $todaysRevenueQuery->sum('total_tomxu') +
+                    $todaysRevenueQuery->unique('parent_id')->sum('delivery_fee') +
+                    $todaysRevenueQuery->unique('parent_id')->sum('sales_tax');
             } else {
                 $todaysRevenue = $todaysRevenueQuery->whereIn('A.shop_id', $shops)->get()->sum('paid_total');
                 $todaysTomxu = $todaysRevenueQuery->whereIn('A.shop_id', $shops)->get()->sum('total_tomxu');
@@ -134,8 +134,8 @@ class AnalyticsController extends CoreController
 
 
             return [
-                'totalTomxu' => $totalTomxu,
-                'todaysTomxu' => $todaysTomxu,
+                'totalTomxu' => $totalTomxu ?? 0,
+                'todaysTomxu' => $todaysTomxu ?? 0,
                 'totalRevenue'              => $totalRevenue,
                 'totalRefunds'              => $totalRefunds ?? 0,
                 'totalShops'                => $totalShops,
