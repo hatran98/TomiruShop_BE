@@ -406,7 +406,7 @@ Route::group(
 
 Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sanctum']], function () {
     // Route::get('messages/get-conversations/{shop_id}', [ConversationController::class, 'getConversationByShopId']);
-    // Route::get('analytics', [AnalyticsController::class, 'analytics']);
+//     Route::get('analytics', [AnalyticsController::class, 'analytics']);
     Route::apiResource('types', TypeController::class, [
         'only' => ['store', 'update', 'destroy'],
     ]);
