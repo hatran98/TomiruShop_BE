@@ -34,6 +34,28 @@ trait CalculatePaymentTrait
         }
     }
 
+    public function calculateTomxuSubtotal($cartItems)
+    {
+        if (!is_array($cartItems)) {
+            throw new MarvelException(CART_ITEMS_NOT_FOUND);
+        }
+        $subtotal = 0;
+        try {
+            foreach ($cartItems as $item) {
+                if (isset($item['variation_option_id'])) {
+                    $variation = Variation::findOrFail($item['variation_option_id']);
+                    $subtotal += $this->calculateEachItemTomxuTotal($variation, $item['order_quantity']);
+                } else {
+                    $product = Product::findOrFail($item['product_id']);
+                    $subtotal += $this->calculateEachItemTomxuTotal($product, $item['order_quantity']);
+                }
+            }
+            return $subtotal;
+        } catch (\Throwable $th) {
+            throw new MarvelException($product->tomxu);
+        }
+    }
+
     public function calculateDiscount($coupon, $subtotal)
     {
         if ($coupon->id) {
@@ -55,6 +77,17 @@ trait CalculatePaymentTrait
             $total += $item->sale_price * $quantity;
         } else {
             $total += $item->price * $quantity;
+        }
+        return $total;
+    }
+
+    public function calculateEachItemTomxuTotal($item, $quantity)
+    {
+        $total = 0;
+        if ($item->sale_price) {
+            $total += $item->sale_price * $quantity;//this should be sale_price for tomxu
+        } else {
+            $total += $item->tomxu->price_tomxu * $quantity;
         }
         return $total;
     }

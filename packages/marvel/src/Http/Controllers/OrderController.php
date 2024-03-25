@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
@@ -19,7 +20,9 @@ use Marvel\Database\Models\Order;
 use Marvel\Database\Models\Settings;
 use Marvel\Database\Repositories\OrderRepository;
 use Marvel\Enums\PaymentGatewayType;
+use Marvel\Enums\PaymentStatus;
 use Marvel\Enums\Permission;
+use Marvel\Enums\Role;
 use Marvel\Exceptions\MarvelException;
 use Marvel\Exports\OrderExport;
 use Marvel\Http\Requests\OrderCreateRequest;
@@ -173,7 +176,9 @@ class OrderController extends CoreController
         $orderParam = $request->tracking_number ?? $request->id;
         try {
             $order = $this->repository->where('language', $language)->with([
-                'products',
+                'products' => function ($query) {
+                    return $query->with('tomxu');
+                },
                 'shop',
                 'children.shop',
                 'wallet_point',
@@ -255,6 +260,7 @@ class OrderController extends CoreController
         return $this->repository->updateOrder($request);
     }
 
+
     /**
      * Remove the specified resource from storage.
      *
@@ -264,9 +270,22 @@ class OrderController extends CoreController
     public function destroy($id)
     {
         try {
-            return $this->repository->findOrFail($id)->delete();
+            $user = Auth::user();
+            $order = $this->repository->findOrFail($id);
+
+            if ($user->hasRole(Role::CUSTOMER)) {
+
+                if ($user->id != $order->customer->id) {
+                    throw new MarvelException(NOT_AUTHORIZED);
+                }
+                if ($order->payment_status != PaymentStatus::PENDING) {
+                    throw new MarvelException(CANNOT_CANCEL_ORDER);
+                }
+            }
+
+            return $order->delete();
         } catch (MarvelException $e) {
-            throw new MarvelException(NOT_FOUND);
+            throw $e;
         }
     }
 
@@ -402,7 +421,7 @@ class OrderController extends CoreController
             $options->setIsPhpEnabled(true);
             $options->setIsJavascriptEnabled(true);
             $pdf->getDomPDF()->setOptions($options);
-            
+
             $filename = 'invoice-order-' . $payloads['order_id'] . '.pdf';
 
             return $pdf->download($filename);
