@@ -308,6 +308,7 @@ class Product extends Model
 
     public function tomxu()
     {
-        return $this->hasOne(Tomxu::class, 'product_id');
+        return $this->hasOne(Tomxu::class, 'product_id') ;
     }
+
 }
