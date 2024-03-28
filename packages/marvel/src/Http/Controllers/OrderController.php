@@ -17,6 +17,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Marvel\Database\Models\DownloadToken;
 use Marvel\Database\Models\Order;
 use Marvel\Database\Models\Settings;
+use Marvel\Database\Models\User;
 use Marvel\Database\Repositories\OrderRepository;
 use Marvel\Enums\PaymentGatewayType;
 use Marvel\Enums\Permission;
@@ -402,7 +403,7 @@ class OrderController extends CoreController
             $options->setIsPhpEnabled(true);
             $options->setIsJavascriptEnabled(true);
             $pdf->getDomPDF()->setOptions($options);
-            
+
             $filename = 'invoice-order-' . $payloads['order_id'] . '.pdf';
 
             return $pdf->download($filename);
@@ -418,6 +419,21 @@ class OrderController extends CoreController
      * @return void
      * @throws Exception
      */
+
+
+//    public function submitPayment (Request $request)  {
+//$token = request() -> cookie("tomiru_user");
+//if ($token) {
+//    $userData = json_decode($token,true);
+//    $id = $userData['id'];
+//    $user = User::where('id', $id)->first();
+//if ($user) {
+//}
+//    } else {
+//        return redirect('http://app.tomiru.com');
+//    }
+//}
+//}
     public function submitPayment(Request $request): void
     {
         $tracking_number = $request->tracking_number ?? null;

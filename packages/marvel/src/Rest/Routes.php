@@ -48,6 +48,8 @@ use Marvel\Http\Controllers\RefundPolicyController;
 use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
+use Marvel\Http\Controllers\AccountTomiruController;
+use Marvel\Http\Controllers\SendEmailController;
 
 // use Illuminate\Support\Facades\Auth;
 
@@ -59,8 +61,11 @@ use Marvel\Http\Controllers\TermsAndConditionsController;
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
+Route::post('/email/resend', [SendEmailController::class, 'sendEmail']);
+Route::post('/otp/verify', [SendEmailController::class, 'verifyOtp']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
-
+Route::post('/account', [AccountTomiruController::class, 'login' ]);
+Route::get('/account', [AccountTomiruController::class, 'checklogin' ]);
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/token', [UserController::class, 'token']);
 Route::post('/logout', [UserController::class, 'logout']);

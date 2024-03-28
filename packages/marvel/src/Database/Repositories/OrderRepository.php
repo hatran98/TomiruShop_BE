@@ -109,6 +109,9 @@ class OrderRepository extends BaseRepository
      * @return LengthAwarePaginator|JsonResponse|Collection|mixed
      * @throws Exception
      */
+
+
+
     public function storeOrder($request, $settings): mixed
     {
         $request['tracking_number'] = $this->generateTrackingNumber();
@@ -326,13 +329,13 @@ class OrderRepository extends BaseRepository
     /**
      * This function creates an array of data for an email invoice, including order information,
      * settings, translated text, and URL.
-     * 
+     *
      * @param request This is an HTTP request object that contains information about the current
      * request being made to the server. It is used to retrieve data from the request, such as the
      * language and whether the text should be displayed right-to-left (RTL).
      * @param order The order object that contains information about the order, such as the customer
      * details, order items, and total amount.
-     * 
+     *
      * @return array An array containing order data, settings data, translated text, RTL status,
      * language, and a URL.
      */
