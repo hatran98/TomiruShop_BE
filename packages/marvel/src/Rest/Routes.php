@@ -48,6 +48,8 @@ use Marvel\Http\Controllers\RefundPolicyController;
 use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
+use Marvel\Http\Controllers\PaymentTomxuController;
+use Marvel\Http\Controllers\ServiceTomxuController;
 
 // use Illuminate\Support\Facades\Auth;
 
@@ -196,6 +198,12 @@ Route::resource('refund-policies', RefundPolicyController::class, [
     'only' => ['index', 'show'],
 ]);
 
+
+
+//Route::post('payment-order-tomxu', [PaymentOrderTomxuController::class, 'transaction']);
+
+
+
 /**
  * ******************************************
  * Authorized Route for Customers only
@@ -205,6 +213,9 @@ Route::resource('refund-policies', RefundPolicyController::class, [
 Route::post('free-downloads/digital-file', [DownloadController::class, 'generateFreeDigitalDownloadableUrl']);
 
 Route::group(['middleware' => ['can:' . Permission::CUSTOMER, 'auth:sanctum', 'email.verified']], function () {
+    Route::post('payment-tomxu', [PaymentTomxuController::class, 'transaction']);
+    Route::post('payment-order-tomxu', [ServiceTomxuController::class, 'transaction']);
+    Route::post('balance-tomxu', [ServiceTomxuController::class, 'balanceTomxu']);
 
     Route::post('/update-email', [UserController::class, 'updateUserEmail']);
     Route::get('me', [UserController::class, 'me']);
