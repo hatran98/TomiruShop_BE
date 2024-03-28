@@ -50,6 +50,8 @@ use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
 use Marvel\Http\Controllers\PaymentTomxuController;
 use Marvel\Http\Controllers\ServiceTomxuController;
+use Marvel\Http\Controllers\AccountTomiruController;
+use Marvel\Http\Controllers\SendEmailController;
 
 // use Illuminate\Support\Facades\Auth;
 
@@ -61,8 +63,11 @@ use Marvel\Http\Controllers\ServiceTomxuController;
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
+Route::post('/email/resend', [SendEmailController::class, 'sendEmail']);
+//Route::post('/otp/verify', [SendEmailController::class, 'verifyOtp']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
-
+Route::post('/account', [AccountTomiruController::class, 'login' ]);
+Route::get('/account', [AccountTomiruController::class, 'checklogin' ]);
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/token', [UserController::class, 'token']);
 Route::post('/logout', [UserController::class, 'logout']);
@@ -417,7 +422,7 @@ Route::group(
 
 Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sanctum']], function () {
     // Route::get('messages/get-conversations/{shop_id}', [ConversationController::class, 'getConversationByShopId']);
-    // Route::get('analytics', [AnalyticsController::class, 'analytics']);
+//     Route::get('analytics', [AnalyticsController::class, 'analytics']);
     Route::apiResource('types', TypeController::class, [
         'only' => ['store', 'update', 'destroy'],
     ]);

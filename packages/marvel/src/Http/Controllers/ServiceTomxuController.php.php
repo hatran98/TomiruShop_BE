@@ -12,7 +12,7 @@ use Marvel\Database\Models\OrderProduct;
 use Marvel\Database\Models\UsersOtp;
 use Carbon\Carbon;
 use Marvel\Database\Models\UsersTransaction;
-
+use Marvel\Http\Controllers\SendEmailController;
 class ServiceTomxuController extends CoreController
 {
     public function checkAuth($customer_id){
@@ -38,7 +38,6 @@ class ServiceTomxuController extends CoreController
             'products.*.quantity' => 'required',
             'products.*.tomxu' => 'required',
             'products.*.tomxu_subtotal' => 'required',
-
         ]);
 
         $isAuth = $this->checkAuth($validatedData['customer_id']);
@@ -64,67 +63,55 @@ class ServiceTomxuController extends CoreController
                     'balance'=> $newBalance,
                     'updated_at' => now(),
                 ]);
-                //check otp
-                $user_otp = UsersOtp::where('user_id', $validatedData['customer_id'])
-                    ->where('type', 'verify_order')
-                    ->orderBy('created_at', 'desc')
-                    ->first();
-                if(!$user_otp){
-                    throw new \Exception('Invalid OTP');
-                }
-                $otp = $user_otp->otp;
-                $specificDateTime = Carbon::parse( $user_otp->expires_at);
-                $isExp =$specificDateTime->isPast();
+                $sendEmailController = new SendEmailController();
+                $isOtp = $sendEmailController->verifyOtp($validatedData['type'], $validatedData['customer_id'], $validatedData['otp']);
 
-                if( $otp != $validatedData['otp'] && !$isExp &&  $user_otp->status != 2){
-                    throw new \Exception('Invalid OTP');
+                if(!$isOtp) {
+                  throw new \Exception('Invalid OTP');
                 }
-                $user_otp->update([
-                    'status'=> 'used',
+
+                $order = Order::where('tracking_number',$validatedData['tracking_number'])->first();
+                if($order){
+                    $order->update([
+                        'order_status'=> 'order-completed',
+                        'payment_status'=>'payment-success',
+                        'updated_at' => now(),
+                        ]);
+                }else {
+                    Order::create([
+                        'tracking_number' => floatval($validatedData['tracking_number']),
+                        'customer_id' => floatval($validatedData['customer_id']),
+                        'customer_contact' => floatval($validatedData['customer_contact']),
+                        'customer_name' => $validatedData['customer_name'],
+                        'total_tomxu' => $validatedData['total_tomxu'],
+                        'order_status' => 'order-completed',
+                        'payment_status' => 'payment-success',
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]);
+                    foreach ($validatedData['products'] as $product) {
+                        OrderProduct::create([
+                            'order_id' => $order->id,
+                            'product_id' => $product['product_id'],
+                            'order_quantity' =>  $product['quantity'],
+                            'tomxu' =>  $product['tomxu'],
+                            'tomxu_subtotal' =>  $product['tomxu_subtotal'],
+                            'updated_at' => now (),
+                            'created_at' => now(),
+                        ]);
+                    }
+                }
+                UsersTransaction::create([
+                    'type' => 29,
+                    'user_id' => floatval($validatedData['customer_id']),
+                    'token_id' =>  1,
+                    'status' =>  'success',
+                    'value' =>  floatval($validatedData['total_tomxu']),
+                    'pre_balance' => $balanceUser,
+                    'post_balance' => $newBalance,
+                    'updated_at' => now(),
+                    'created_at' => now(),
                 ]);
-
-//                $order = Order::where('tracking_number',$validatedData['tracking_number'])->first();
-//                if($order){
-//                    $order->update([
-//                        'order_status'=> 'order-completed',
-//                        'payment_status'=>'payment-success',
-//                        'updated_at' => now(),
-//                        ]);
-//                }else {
-//                    Order::create([
-//                        'tracking_number' => floatval($validatedData['tracking_number']),
-//                        'customer_id' => floatval($validatedData['customer_id']),
-//                        'customer_contact' => floatval($validatedData['customer_contact']),
-//                        'customer_name' => $validatedData['customer_name'],
-//                        'total_tomxu' => $validatedData['total_tomxu'],
-//                        'order_status' => 'order-completed',
-//                        'payment_status' => 'payment-success',
-//                        'updated_at' => now(),
-//                        'created_at' => now(),
-//                    ]);
-//                    foreach ($validatedData['products'] as $product) {
-//                        OrderProduct::create([
-//                            'order_id' => $order->id,
-//                            'product_id' => $product['product_id'],
-//                            'order_quantity' =>  $product['quantity'],
-//                            'tomxu' =>  $product['tomxu'],
-//                            'tomxu_subtotal' =>  $product['tomxu_subtotal'],
-//                            'updated_at' => now (),
-//                            'created_at' => now(),
-//                        ]);
-//                    }
-//                }
-//                UsersTransaction::create([
-//                    'type' => 29,
-//                    'user_id' => floatval($validatedData['customer_id']),
-//                    'token_id' =>  1,
-//                    'status' =>  'success',
-//                    'value' =>  floatval($validatedData['total_tomxu']),
-//                    'pre_balance' => $balanceUser,
-//                    'post_balance' => $newBalance,
-//                    'updated_at' => now(),
-//                    'created_at' => now(),
-//                ]);
 
             });
             DB::commit();
