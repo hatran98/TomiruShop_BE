@@ -26,14 +26,24 @@ class SendEmailController extends CoreController
         if ($user) {
             $otp = mt_rand(100000, 999999);
             $expiresAt = Carbon::now()->addMinutes(2);
-
-            Mail::to($recipientEmail)->send(new SampleEmail($otp));
+            Mail::to($recipientEmail)->send(new SampleEmail($otp,''));
 
             $this->storeOTP($user->id, $type, $otp, $expiresAt);
 
            return response('Email sent successfully!', 200);
         } else {
             return "Email not found in database!";
+        }
+    }
+    public function sendOrderTomxu($email,$content)
+    {
+
+        $recipientEmail = $email;
+        $user = User::where('email', $recipientEmail)->first();
+
+        if ($user) {
+            Mail::to($recipientEmail)->send(new SampleEmail('', $content));
+
         }
     }
 
