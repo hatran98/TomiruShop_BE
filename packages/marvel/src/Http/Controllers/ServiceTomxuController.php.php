@@ -5,6 +5,7 @@ namespace Marvel\Http\Controllers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Marvel\Database\Models\Product;
 use Marvel\Database\Models\Tomxu;
 use Marvel\Database\Models\User;
 use Marvel\Database\Models\UsersBalance;
@@ -129,7 +130,7 @@ class ServiceTomxuController extends CoreController
 
         $userBalance->update([
             'balance' => $newBalance,
-            'updated_at' => now(),
+            'updated_at' => now()->microsecond,
         ]);
 
         return $userBalance;
@@ -147,12 +148,13 @@ class ServiceTomxuController extends CoreController
             'value' => floatval($validatedData['total_tomxu']),
             'pre_balance' => $userBalance->balance,
             'post_balance' => $newBalance,
-            'updated_at' => now(),
             'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
     private function processOrder($validatedData)
     {
+
         $order = Order::where('tracking_number', $validatedData['tracking_number'])
             ->where('order_status', 'order-pending')
             ->where('payment_status', 'payment-pending')
@@ -160,11 +162,13 @@ class ServiceTomxuController extends CoreController
 
         $orderProducts = $order->products;
 
+
         if (count($orderProducts) !== count($validatedData['products'])) {
             throw new \Exception('Number of products does not match');
         }
 
         foreach ($validatedData['products'] as $product) {
+            $productDB = Product::where('id', $product['product_id'])->firstOrFail();
             $orderProduct = $orderProducts->firstWhere('id', $product['product_id']);
 
             if (!$orderProduct) {
@@ -190,6 +194,13 @@ class ServiceTomxuController extends CoreController
                 'current_balance' => floatval($current_balance) + $addTomxu,
                 'updated_at' => now(),
             ]);
+
+            $productDB->update([
+                'quantity' => floatval($productDB -> quantity)- floatval($product['quantity']),
+                'updated_at' => now(),
+                'sold_quantity' => floatval($productDB->sold_quantity) + floatval($product['quantity']),
+            ]);
+
         }
 
         $order->update([
@@ -197,6 +208,8 @@ class ServiceTomxuController extends CoreController
             'payment_status' => 'payment-success',
             'updated_at' => now(),
         ]);
+
+
 
         return $order;
     }

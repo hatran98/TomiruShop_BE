@@ -4,7 +4,7 @@ namespace Marvel\Database\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-class UsersTransaction extends Model
+class  UsersTransaction extends Model
 {
     protected $table = 'users_transaction';
 
@@ -21,6 +21,7 @@ class UsersTransaction extends Model
         'fee' => 'json',
         'pre_balance' => 'json',
         'post_balance' => 'json',
+
     ];
 
 //    public $timestamps = true;
