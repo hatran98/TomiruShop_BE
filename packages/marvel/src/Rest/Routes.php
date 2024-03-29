@@ -218,7 +218,7 @@ Route::resource('refund-policies', RefundPolicyController::class, [
 Route::post('free-downloads/digital-file', [DownloadController::class, 'generateFreeDigitalDownloadableUrl']);
 
 Route::group(['middleware' => ['can:' . Permission::CUSTOMER, 'auth:sanctum', 'email.verified']], function () {
-    Route::post('payment-tomxu', [PaymentTomxuController::class, 'transaction']);
+    Route::post('transaction-tomxu', [PaymentTomxuController::class, 'transaction']);
     Route::post('payment-order-tomxu', [ServiceTomxuController::class, 'transaction']);
     Route::post('balance-tomxu', [ServiceTomxuController::class, 'balanceTomxu']);
 

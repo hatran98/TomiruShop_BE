@@ -50,7 +50,7 @@ class Order extends Model
     public function products(): belongsToMany
     {
         return $this->belongsToMany(Product::class)
-            ->withPivot('order_quantity', 'unit_price', 'subtotal', 'variation_option_id')
+            ->withPivot('order_quantity', 'unit_price', 'subtotal', 'variation_option_id','tomxu',  'tomxu_subtotal')
             ->withTimestamps();
     }
 
@@ -86,6 +86,13 @@ class Order extends Model
         return $this->hasMany('Marvel\Database\Models\Order', 'parent_id', 'id');
     }
 
+    /**
+     * @return HasMany
+     */
+    public function orderProducts(): HasMany
+    {
+        return $this->HasMany(OrderProduct::class, 'order_id','id');
+    }
     /**
      * @return HasOne
      */

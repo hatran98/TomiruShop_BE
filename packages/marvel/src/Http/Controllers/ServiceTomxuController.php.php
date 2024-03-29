@@ -15,6 +15,7 @@ use Marvel\Database\Models\UsersOtp;
 use Carbon\Carbon;
 use Marvel\Database\Models\UsersTransaction;
 use Marvel\Http\Controllers\SendEmailController;
+
 class ServiceTomxuController extends CoreController
 {
     public function checkAuth($customer_id){
@@ -33,108 +34,81 @@ class ServiceTomxuController extends CoreController
             'customer_id' => 'required',
             'customer_contact' => 'required',
             'customer_name' => 'required',
-            'total_tomxu' => 'required',
             'otp' => 'required',
-            'products' => 'required|array',
-            'products.*.product_id' => 'required',
-            'products.*.shop_id' => 'required',
-            'products.*.quantity' => 'required',
-            'products.*.tomxu' => 'required',
-            'products.*.tomxu_subtotal' => 'required',
         ]);
 
-//        return $validatedData['products'];
         $user = $this->checkAuth($validatedData['customer_id']);
         if(!$user){
             return ['message' => 'Unauthorized','success' => false];
         }
-
+        $order = Order::where('tracking_number',$validatedData['tracking_number'])->first();
+        if(!$order){
+            return ['message' => 'Order not exist','success' => false];
+        }
+        $products = $order->products;
+        if($order->payment_status == 'payment-success'){
+            return ['message' => 'The order has been paid','success' => false];
+        }
         try {
             DB::transaction(function ()
-            use ($validatedData,$user)
+            use ($validatedData,$user,$order,$products)
             {
+                //verify otp
+                $sendEmailController = new SendEmailController();
+                $isOtp = $sendEmailController->verifyOtp('verify_order', $validatedData['customer_id'], $validatedData['otp']);
+                if(!$isOtp) {
+                    throw new \Exception('Invalid OTP');
+                }
+                //check balance
                 $userBalance = UsersBalance::where('user_id',$validatedData['customer_id'])
                     ->where('token_id', 1)
                     ->lockForUpdate()
                     ->first();
                 $balanceUser = $userBalance->balance;
-                //check balance of customer and minus
-                if($balanceUser < floatval($validatedData['total_tomxu']) ){
+                $totalTomxu = $order->total_tomxu;
+                if(floatval($balanceUser) < floatval($totalTomxu) ){
                     throw new \Exception('Insufficient balance to complete the transaction');
                 }
-                $newBalance = floatval($balanceUser) - floatval($validatedData['total_tomxu']);
-                $userBalance->update([
-                    'balance'=> $newBalance,
-                    'updated_at' => now(),
-                ]);
-                //verify otp
-                $sendEmailController = new SendEmailController();
-                $isOtp = $sendEmailController->verifyOtp($validatedData['type'], $validatedData['customer_id'], $validatedData['otp']);
-                if(!$isOtp) {
-                  throw new \Exception('Invalid OTP');
-                }
-                //update order
-                $order = Order::where('tracking_number',$validatedData['tracking_number'])->first();
-                if($order){
-                    $order->update([
-                        'order_status'=> 'order-completed',
-                        'payment_status'=>'payment-success',
-                        'updated_at' => now(),
-                        ]);
-                    //add tomxu for shop
-                    foreach ($validatedData['products'] as $product) {
-                        $balanceShop =  Balance::where('shop_id',$product['shop_id'])->first();
-                        $current_balance= $balanceShop->current_balance;
-                        $addTomxu = floatval($product['tomxu']) * $product['quantity'];
-                        $balanceShop->update([
-                            'current_balance'=> floatval($current_balance) + $addTomxu,
-                            'updated_at' => now(),
-                        ]);
-                    }
-                } else {
-                    //if
-//                    Order::create([
-//                        'tracking_number' => floatval($validatedData['tracking_number']),
-//                        'customer_id' => floatval($validatedData['customer_id']),
-//                        'customer_contact' => floatval($validatedData['customer_contact']),
-//                        'customer_name' => $validatedData['customer_name'],
-//                        'total_tomxu' => $validatedData['total_tomxu'],
-//                        'order_status' => 'order-completed',
-//                        'payment_status' => 'payment-success',
-//                        'updated_at' => now(),
-//                        'created_at' => now(),
-//                    ]);
-//                    foreach ($validatedData['products'] as $product) {
-//                        $balanceShop =  Balance::where('shop_id',$product['shop_id'])->first();
-//                        $current_balance= $balanceShop->current_balance;
-//                        $addTomxu = floatval($product['tomxu']) * $product['quantity'];
-//                        $balanceShop->update([
-//                            'current_balance'=> floatval($current_balance) + $addTomxu,
-//                            'updated_at' => now(),
-//                        ]);
-//                        OrderProduct::create([
-//                            'order_id' => $order->id,
-//                            'product_id' => $product['product_id'],
-//                            'order_quantity' =>  $product['quantity'],
-//                            'tomxu' =>  $product['tomxu'],
-//                            'tomxu_subtotal' =>  $product['tomxu_subtotal'],
-//                            'updated_at' => now (),
-//                            'created_at' => now(),
-//                        ]);
-//                    }
-                }
+                $newBalance = floatval($balanceUser) - floatval($totalTomxu);
+                //create transaction
                 UsersTransaction::create([
                     'type' => 29,
                     'user_id' => floatval($validatedData['customer_id']),
                     'token_id' =>  1,
                     'status' =>  'success',
-                    'value' =>  floatval($validatedData['total_tomxu']),
+                    'value' =>  $totalTomxu,
                     'pre_balance' => $balanceUser,
                     'post_balance' => $newBalance,
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]);
+                // minus for customer
+                $userBalance->update([
+                    'balance'=> $newBalance,
+                    'updated_at' => now(),
+                ]);
+                //update order
+                $order->update([
+//                    'order_status'=> 'order-completed',
+                    'payment_status'=>'payment-success',
+                    'updated_at' => now(),
+                ]);
+                $totalTomxuFromProducts = 0;
+                //add tomxu for shop pivot
+                foreach ($products as $product) {
 
+                    $balanceShop =  Balance::where('shop_id',$product->shop_id)->first();
+                    $current_balance= $balanceShop->current_balance;
+                    $addTomxu = $product->pivot['tomxu_subtotal'];
+                    $totalTomxuFromProducts += floatval($addTomxu);
+                        $balanceShop->update([
+                        'current_balance'=> floatval($current_balance) + floatval($addTomxu),
+                        'updated_at' => now(),
+                    ]);
+                }
+                if($totalTomxu != $totalTomxuFromProducts){
+                    throw new \Exception('Total tomxu of order and total tomxu of products not match');
+                }
                 $sendEmail = new SendEmailController();
                 $content = "<h3>Xin chào $user->name </h3>
                             <p> Mã đơn hàng: $order->tracking_number </p>
@@ -155,7 +129,7 @@ class ServiceTomxuController extends CoreController
                   'customer_name' => $validatedData['customer_name'],
                   'customer_contact' => $validatedData['customer_contact'],
                   'tracking_number' => $validatedData['tracking_number'],
-                  'total_tomxu' => $validatedData['total_tomxu'],
+                  'total_tomxu' => $order->total_tomxu,
               ]
         ];
     }

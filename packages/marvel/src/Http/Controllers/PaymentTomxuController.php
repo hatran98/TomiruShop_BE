@@ -2,6 +2,7 @@
 
 namespace Marvel\Http\Controllers;
 
+use DateTime;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -23,63 +24,54 @@ class PaymentTomxuController extends CoreController
             'otp' => 'required',
         ]);
 
-
+        $abc =
+        //check user
         $users = Auth::user();
         if(!$users || $users->id != $validatedData['user_id']){
-            return response()->json(['message' => 'Unauthorized','success' => false], 401);
+            return ['message' => 'Unauthorized','success' => false];
         }
-
         $userReceive  = User::find($validatedData['to_id']);
         if(!$userReceive){
-            return response()->json(['message' => 'Recipient does not exist', 'success' => false], 401);
+            return ['message' => 'Recipient does not exist', 'success' => false];
+        }
+        //verify otp
+        $sendEmailController = new SendEmailController();
+        $isOtp = $sendEmailController->verifyOtp('verify_send_token', $validatedData['user_id'], $validatedData['otp']);
+        if(!$isOtp) {
+            return ['message' => 'Invalid OTP','success' => false];
         }
 
         try {
             DB::transaction(function ()
             use ($validatedData)
             {
-                $date = Carbon::now();
-                $millisecondsNow = $date->timestamp * 1000;
+                //get balance of user
                 $balanceUserReceive = UsersBalance::where('user_id',$validatedData['to_id'])
                     ->where('token_id', 1)
                     ->lockForUpdate()
                     ->first();
-
                 $balanceUserSend = UsersBalance::where('user_id',$validatedData['from_id'])
                     ->where('token_id', 1)
                     ->lockForUpdate()
                     ->first();
-
-                $currentBalanceSend =  $balanceUserSend->balance;
-                $currentBalanceReceive =  $balanceUserReceive->balance;
+                $currentBalanceSend =  floatval($balanceUserSend->balance);
+                $currentBalanceReceive =  floatval($balanceUserReceive->balance);
                //check balance
-                if($currentBalanceSend < floatval($validatedData['value']) ){
+                if(($currentBalanceSend) < floatval($validatedData['value']) ){
                     throw new \Exception('Insufficient balance to complete the transaction');
                 }
                 $newBalanceSend = $currentBalanceSend - floatval($validatedData['value']);
                 $newBalanceReceive =$currentBalanceReceive + floatval($validatedData['value']);
+
+
                 $balanceUserSend->update([
                     'balance'=> $newBalanceSend,
-                    'updated_at' => $millisecondsNow,
+                    'updated_at' => now(),
                 ]);
                 $balanceUserReceive->update([
                     'balance'=> $newBalanceReceive,
-                    'updated_at' => $millisecondsNow,
+                    'updated_at' =>  now(),
                 ]);
-                //check otp
-                $user_otp = DB::table('users_otp')
-                    ->where('user_id', $validatedData['from_id'])
-                    ->where('type', 3)
-                    ->orderBy('created_at', 'desc')
-                    ->first();
-                if(!$user_otp){
-                    throw new \Exception('Invalid OTP');
-                }
-                $otp = $user_otp->otp;
-                $isExp = $user_otp->created_at;
-                if( $otp!= $validatedData['otp'] || $isExp + 160*1000 < $millisecondsNow){
-                    throw new \Exception('Invalid OTP');
-                }
 
                 // send
                UsersTransaction::create([
@@ -94,8 +86,8 @@ class PaymentTomxuController extends CoreController
                     'fee' => 0,
                     'pre_balance' => $currentBalanceSend,
                     'post_balance' => $newBalanceSend,
-                    'updated_at' => $millisecondsNow,
-                    'created_at' => $millisecondsNow,
+                    'updated_at' =>  now(),
+                    'created_at' =>  now(),
                ]);
                 //receive
                UsersTransaction::create([
@@ -110,9 +102,16 @@ class PaymentTomxuController extends CoreController
                     'fee' => 0,
                     'pre_balance' => $currentBalanceReceive,
                     'post_balance' => $newBalanceReceive,
-                    'updated_at' => $millisecondsNow,
-                    'created_at' => $millisecondsNow,
+                    'updated_at' =>  now(),
+                    'created_at' =>  now(),
                ]);
+
+//                $sendEmail = new SendEmailController();
+//                $content = "<h3>Xin chào $user->name </h3>
+//                            <p> Mã đơn hàng: $order->tracking_number </p>
+//                            <p> Đã thanh toán thành công </p>";
+//                $sendEmail->sendOrderTomxu($user->email,$content);
+
             });
             DB::commit();
 
