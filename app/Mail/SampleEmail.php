@@ -34,4 +34,10 @@ class SampleEmail extends Mailable
                 ->html($this->content->content);
         }
     }
+
+    public function buildOtherContent($content)
+    {
+        return $this->subject('Other subject')
+            ->html('<h2>Other Content</h2><p>' . $content . '.</p>');
+    }
 }
