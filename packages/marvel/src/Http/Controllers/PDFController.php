@@ -1,9 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace Marvel\Http\Controllers;
 
 use Dompdf\Options;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\Crypt;
@@ -13,7 +12,7 @@ use Marvel\Database\Models\UserCardOtpToken;
 use Marvel\Database\Models\UserOtpCard;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-class PdfController extends Controller
+class PDFController extends CoreController
 {
     public function generatePdf(Request $request)
     {
@@ -49,9 +48,6 @@ if ($response['statusCode'] === 200) {
 
         return $response;
 
-//        $this->sendEmailWithPdf($pdf, $card_serial);
-//
-//        return response()->json(['message' => 'Email sent successfully'], 200);
     }
 
 

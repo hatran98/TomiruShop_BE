@@ -48,7 +48,7 @@ use Marvel\Http\Controllers\RefundPolicyController;
 use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
-
+use Marvel\Http\Controllers\PDFController;
 // use Illuminate\Support\Facades\Auth;
 
 /**
@@ -59,6 +59,7 @@ use Marvel\Http\Controllers\TermsAndConditionsController;
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
+Route::post('/generate-pdf',[PDFController::class, 'generatePdf']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
 
 Route::post('/register', [UserController::class, 'register']);
