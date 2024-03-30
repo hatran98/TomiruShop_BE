@@ -48,8 +48,7 @@ use Marvel\Http\Controllers\RefundPolicyController;
 use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
-use Marvel\Http\Controllers\CardController;
-use App\Http\Controllers\PdfController;
+
 // use Illuminate\Support\Facades\Auth;
 
 /**
@@ -59,10 +58,6 @@ use App\Http\Controllers\PdfController;
  */
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
-Route::post('/created-card', [CardController::class , 'createdCard']);
-Route::post('/generate-pdf', [PdfController::class , 'generatePdf']);
-Route::get('/activate-card', [CardController::class , 'activateCard']);
-
 
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
 

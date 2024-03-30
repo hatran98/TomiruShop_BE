@@ -210,7 +210,9 @@ class ProductController extends CoreController
         $setting = $this->settings->first();
         if ($this->repository->hasPermission($request->user(), $request->shop_id)) {
             $id = $request->id;
-            return $this->repository->updateProduct($request, $id, $setting);
+             $this->repository->updateProduct($request, $id, $setting);
+            $this->tomxurepository->updateTomxu($id, $request);
+
         } else {
             throw new AuthorizationException(NOT_AUTHORIZED);
         }
@@ -240,6 +242,8 @@ class ProductController extends CoreController
     {
         try {
             $product = $this->repository->findOrFail($request->id);
+            $this->tomxurepository->deleteOneByProductId($request->id);
+
             if ($this->repository->hasPermission($request->user(), $product->shop_id)) {
                 $product->delete();
                 return $product;

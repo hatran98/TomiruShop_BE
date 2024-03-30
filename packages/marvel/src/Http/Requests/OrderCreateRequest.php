@@ -48,6 +48,7 @@ class OrderCreateRequest extends FormRequest
             'altered_payment_gateway' => 'nullable|string',
             'note'                    => 'nullable|string',
             'isFullWalletPayment'     => 'required|boolean',
+            'total_tomxu'             => 'numeric',
         ];
     }
 

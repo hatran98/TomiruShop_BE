@@ -32,6 +32,7 @@ use Marvel\Events\OrderCreated;
 use Marvel\Events\OrderProcessed;
 use Marvel\Events\OrderReceived;
 use Marvel\Exceptions\MarvelBadRequestException;
+use Marvel\Exceptions\MarvelException;
 use Marvel\Traits\CalculatePaymentTrait;
 use Marvel\Traits\OrderManagementTrait;
 use Marvel\Traits\OrderStatusManagerWithPaymentTrait;
@@ -39,7 +40,7 @@ use Marvel\Traits\PaymentTrait;
 use Marvel\Traits\WalletsTrait;
 use Prettus\Repository\Criteria\RequestCriteria;
 use Prettus\Repository\Exceptions\RepositoryException;
-
+// check
 class OrderRepository extends BaseRepository
 {
     use WalletsTrait,
@@ -82,6 +83,7 @@ class OrderRepository extends BaseRepository
         'customer_contact',
         'customer_name',
         'note',
+        'total_tomxu',
     ];
 
     public function boot()
@@ -109,6 +111,9 @@ class OrderRepository extends BaseRepository
      * @return LengthAwarePaginator|JsonResponse|Collection|mixed
      * @throws Exception
      */
+
+
+
     public function storeOrder($request, $settings): mixed
     {
         $request['tracking_number'] = $this->generateTrackingNumber();
@@ -209,7 +214,10 @@ class OrderRepository extends BaseRepository
             $amount = round($request['paid_total'], 2);
         }
 
+        $request['total_tomxu'] = $this -> calculateTomxuSubtotal($request['products']);
+
         $order = $this->createOrder($request);
+        $order['total_tomxu'] = $request['total_tomxu'];
 
         if (($useWalletPoints || $request->isFullWalletPayment) && $user) {
             $this->storeOrderWalletPoint(round($request['paid_total'], 2) - $amount, $order->id);
@@ -250,15 +258,21 @@ class OrderRepository extends BaseRepository
     {
         $order = Order::findOrFail($request->id);
         $user = $request->user();
+
+        if ($order->payment_status != PaymentStatus::PENDING) {
+            throw new MarvelException(CANNOT_UPDATE_ORDER);
+        }
+
         if (isset($order->shop_id)) {
             if ($this->hasPermission($user, $order->shop_id)) {
                 return $this->changeOrderStatus($order, $request->order_status);
             }
         } else if ($user->hasPermissionTo(Permission::SUPER_ADMIN)) {
             return $this->changeOrderStatus($order, $request->order_status);
-        } else {
+        } else if ($user->id != $order->customer->id) {
             throw new AuthorizationException(NOT_AUTHORIZED);
         }
+        return $this->changeOrderStatus($order, $request->order_status);
     }
 
     /**
@@ -326,13 +340,13 @@ class OrderRepository extends BaseRepository
     /**
      * This function creates an array of data for an email invoice, including order information,
      * settings, translated text, and URL.
-     * 
+     *
      * @param request This is an HTTP request object that contains information about the current
      * request being made to the server. It is used to retrieve data from the request, such as the
      * language and whether the text should be displayed right-to-left (RTL).
      * @param order The order object that contains information about the order, such as the customer
      * details, order items, and total amount.
-     * 
+     *
      * @return array An array containing order data, settings data, translated text, RTL status,
      * language, and a URL.
      */
@@ -530,6 +544,7 @@ class OrderRepository extends BaseRepository
 
         foreach ($productsByShop as $shop_id => $cartProduct) {
             $amount = array_sum(array_column($cartProduct, 'subtotal'));
+            $total_tomxu = array_sum(array_column($cartProduct, 'subtotal_tomxu'));
             $orderInput = [
                 'tracking_number'  => $this->generateTrackingNumber(),
                 'shop_id'          => $shop_id,
@@ -548,6 +563,7 @@ class OrderRepository extends BaseRepository
                 'amount'           => $amount,
                 'total'            => $amount,
                 'paid_total'       => $amount,
+                'total_tomxu'      => $total_tomxu,
                 'language'         => $language,
                 "payment_gateway"  => $request->payment_gateway,
             ];

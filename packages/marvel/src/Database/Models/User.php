@@ -209,5 +209,31 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->HasMany(Coupon::class);
     }
-
+    /**
+     * users balance
+     *
+     * @return HasMany
+     */
+    public function users_balance(): HasMany
+    {
+        return $this->HasMany(UsersBalance::class, 'user_id');
+    }
+    /**
+     * users transaction
+     *
+     * @return HasMany
+     */
+    public function users_transaction(): HasMany
+    {
+        return $this->HasMany(UsersTransaction::class, 'user_id');
+    }
+    /**
+     * users transaction
+     *
+     * @return HasMany
+     */
+    public function users_otp(): HasMany
+    {
+        return $this->HasMany(UsersOtp::class, 'user_id');
+    }
 }
