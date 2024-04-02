@@ -46,9 +46,9 @@
 <body>
 @foreach($otpData as $otp)
     <div class="otp-card">
-        <div class="otp-number">{{ $otp -> stt }}</div>
+        <div class="otp-number">{{ $otp -> token }}</div>
         <div class="otp-label">OTP</div>
-        <div class="otp-index">{{ $otp->token }}</div>
+        <div class="otp-index">{{ $otp->stt }}</div>
     </div>
 @endforeach
 </body>

@@ -10,20 +10,6 @@ use Defuse\Crypto\Key;
 class AccountTomiruRepository extends BaseRepository
 {
 
-    public function checkLogin($queryData)
-    {
-        if (request()->hasCookie('tomiru_user')) {
-            $userData = request()->cookie('tomiru_user');
-            $user = json_decode($userData);
-            $redirectUrl = 'http://shop.tomiru.com';
-            return ['redirectUrl' => $redirectUrl, 'userData' => $user];
-        } else {
-            $redirectUrl = 'http://app.tomiru.com';
-            return ['redirectUrl' => $redirectUrl, 'userData' => null];
-        }
-    }
-
-
 //    public function processLogin($token , $user_id)
 //    {
 //        $decode_token = (json_decode(base64_decode(str_replace('_', '/', str_replace('-','+',explode('.', $token)[1])))));
@@ -53,29 +39,48 @@ class AccountTomiruRepository extends BaseRepository
 //
 //
 //
-public function processLogin($token , $user_id , $sceret)
-{
-    $sceret = str_replace(' ', '+', $sceret);
-    if ($token && $user_id && $sceret) {
-        $decryptScret = openssl_decrypt($sceret, "AES-256-ECB", env('SECRET_KEY_AES256'));
-        if ($decryptScret == $token) {
-            $decode = (json_decode(base64_decode(str_replace('_', '/', str_replace('-', '+', explode('.', $decryptScret)[1])))));
-            if ($decode->sub == $user_id) {
-                $tomiruUser = User::where('id', $user_id)->firstOrFail();
-                if (!$tomiruUser->hasPermissionTo(Permission::CUSTOMER)) {
-                    $tomiruUser->givePermissionTo(Permission::CUSTOMER);
-                    $tomiruUser->assignRole(Role::CUSTOMER);
+    public function processLogin($token, $user_id, $secret)
+    {
+        // Xử lý chuỗi secret để loại bỏ ký tự không hợp lệ
+        $secret = str_replace(' ', '+', $secret);
+
+        // Kiểm tra xem các tham số đầu vào có tồn tại không
+        if ($token && $user_id && $secret) {
+            // Giải mã secret bằng AES-256-ECB
+            $decryptedSecret = openssl_decrypt($secret, "AES-256-ECB", env('SECRET_KEY_AES256'));
+
+            // Kiểm tra xem secret giải mã có khớp với token không
+            if ($decryptedSecret == $token) {
+                // Decode thông tin từ token
+                $decodedToken = json_decode(base64_decode(str_replace('_', '/', str_replace('-', '+', explode('.', $decryptedSecret)[1]))));
+
+                // Kiểm tra xem user_id từ token có khớp với user_id được cung cấp không
+                if ($decodedToken->sub == $user_id) {
+                    // Lấy thông tin user từ database
+                    $tomiruUser = User::where('id', $user_id)->firstOrFail();
+
+                    // Kiểm tra xem user có quyền CUSTOMER hay không
+                    if (!$tomiruUser->hasPermissionTo(Permission::CUSTOMER)) {
+                        // Nếu không có, cấp quyền CUSTOMER và gán vai trò CUSTOMER cho user
+                        $tomiruUser->givePermissionTo(Permission::CUSTOMER);
+                        $tomiruUser->assignRole(Role::CUSTOMER);
+                    }
+
+                    // Trả về thông tin cần thiết sau khi đăng nhập thành công
+                    return [
+                        "token" => $tomiruUser->createToken('auth_token')->plainTextToken,
+                        "permissions" => $tomiruUser->getPermissionNames(),
+                        "email_verified" => $tomiruUser->getEmailVerifiedAttribute(),
+                        "role" => $tomiruUser->getRoleNames()->first()
+                    ];
                 }
-                return [
-                    "token" => $tomiruUser->createToken('auth_token')->plainTextToken,
-                    "permissions" => $tomiruUser->getPermissionNames(),
-                    "email_verified" => $tomiruUser->getEmailVerifiedAttribute(),
-                    "role" => $tomiruUser->getRoleNames()->first()
-                ];
             }
         }
+
+        // Trả về null nếu không thành công
+        return null;
     }
-}
+
 
 
 
