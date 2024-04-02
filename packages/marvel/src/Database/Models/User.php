@@ -236,4 +236,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->HasMany(UsersOtp::class, 'user_id');
     }
+
+    public function isActive()
+    {
+        return $this->is_active == 1;
+    }
 }

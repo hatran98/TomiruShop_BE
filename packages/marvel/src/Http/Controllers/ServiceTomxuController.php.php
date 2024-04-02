@@ -367,7 +367,7 @@ class ServiceTomxuController extends CoreController
         }
         $currentTime =  Carbon::now();
         $createdAt =Carbon::parse($currentOtp->created_at);
-        if($createdAt->diffInMinutes($currentTime) > 10000){
+        if($createdAt->diffInMinutes($currentTime) > 2){
             return false;
         }
         return true;

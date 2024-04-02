@@ -515,3 +515,12 @@ Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sa
         'only' => ['update'],
     ]);
 });
+
+Route::post('verify_card_otp', [CardController::class,'verify'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::CUSTOMER]);
+
+Route::get('show-otp-cards', [CardController::class,'showCards'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+
+Route::post('assign_card', [CardController::class,'bind'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
