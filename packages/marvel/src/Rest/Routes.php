@@ -48,7 +48,8 @@ use Marvel\Http\Controllers\RefundPolicyController;
 use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
-
+use Marvel\Http\Controllers\PDFController;
+use Marvel\Http\Controllers\CardController;
 // use Illuminate\Support\Facades\Auth;
 
 /**
@@ -58,7 +59,8 @@ use Marvel\Http\Controllers\TermsAndConditionsController;
  */
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
-
+Route::post('/created-key',[CardController::class, 'createtoken']);
+Route::post('/generate-pdf',[PDFController::class, 'generatePdf']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
 
 Route::post('/register', [UserController::class, 'register']);
@@ -357,7 +359,7 @@ Route::group(
         Route::apiResource('shops', ShopController::class, [
             'only' => ['store', 'update', 'destroy'],
         ]);
-//         Route::get('analytics', [AnalyticsController::class, 'analytics']);
+        // Route::get('analytics', [AnalyticsController::class, 'analytics']);
         Route::apiResource('withdraws', WithdrawController::class, [
             'only' => ['store', 'index', 'show'],
         ]);
