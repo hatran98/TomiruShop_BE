@@ -223,7 +223,7 @@ Route::group(['middleware' => ['can:' . Permission::CUSTOMER, 'auth:sanctum', 'e
     Route::post('request-otp', [ServiceTomxuController::class, 'requestOtp']);
     Route::post('payment/tomxu', [ServiceTomxuController::class, 'confirmTransactionWithOTP']);
 
-    Route::post('balance-tomxu', [ServiceTomxuController::class, 'balanceTomxu']);
+    Route::post('balance-tomxu', [ServiceTomxuController::class, 'getBalanceTomxu']);
 
     Route::post('/update-email', [UserController::class, 'updateUserEmail']);
     Route::get('me', [UserController::class, 'me']);

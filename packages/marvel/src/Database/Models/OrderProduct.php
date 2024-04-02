@@ -19,7 +19,6 @@ class OrderProduct extends Model
         'order_id'    => 'json',
         'product_id'     => 'json',
         'order_quantity' => 'json',
-        'tomxu' => 'json',
         'tomxu_subtotal' => 'json',
     ];
 
