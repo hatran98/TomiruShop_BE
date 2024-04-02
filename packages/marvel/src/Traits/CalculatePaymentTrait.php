@@ -42,13 +42,17 @@ trait CalculatePaymentTrait
         $subtotal = 0;
         try {
             foreach ($cartItems as $item) {
-                if (isset($item['variation_option_id'])) {
-                    $variation = Variation::findOrFail($item['variation_option_id']);
-                    $subtotal += $this->calculateEachItemTomxuTotal($variation, $item['order_quantity']);
-                } else {
-                    $product = Product::findOrFail($item['product_id']);
-                    $subtotal += $this->calculateEachItemTomxuTotal($product, $item['order_quantity']);
-                }
+
+                $product = Product::findOrFail($item['product_id']);
+                $subtotal += $this->calculateEachItemTomxuTotal($product, $item['order_quantity']);
+
+//                if (isset($item['variation_option_id'])) {
+//                    $variation = Variation::findOrFail($item['variation_option_id']);
+//                    $subtotal += $this->calculateEachItemTomxuTotal($variation, $item['order_quantity']);
+//                } else {
+//                    $product = Product::findOrFail($item['product_id']);
+//                    $subtotal += $this->calculateEachItemTomxuTotal($product, $item['order_quantity']);
+//                }
             }
             return $subtotal;
         } catch (\Throwable $th) {
@@ -83,13 +87,15 @@ trait CalculatePaymentTrait
 
     public function calculateEachItemTomxuTotal($item, $quantity)
     {
-        $total = 0;
-        if ($item->sale_price) {
-            $total += $item->sale_price * $quantity;//this should be sale_price for tomxu
-        } else {
-            $total += $item->tomxu->price_tomxu * $quantity;
-        }
-        return $total;
+//        $total = 0;
+//        $total += $item->tomxu->price_tomxu * $quantity;
+
+//        if ($item->sale_price) {
+//            $total += $item->sale_price * $quantity;//this should be sale_price for tomxu
+//        } else {
+//            $total += $item->tomxu->price_tomxu * $quantity;
+//        }
+        return ($item->tomxu->price_tomxu) * $quantity;
     }
 
     public function getUserWalletAmount($user)

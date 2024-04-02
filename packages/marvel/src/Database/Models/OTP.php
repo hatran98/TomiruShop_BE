@@ -11,16 +11,10 @@ class OTP extends Model
         'user_id',
         'type',
         'otp',
-        'expires_at',
-        'status'
-    ];
-
-    protected $dates = [
-        'expires_at'
     ];
 
     public function isExpired()
     {
-        return Carbon::parse($this->expires_at)->isPast();
+        return Carbon::parse($this->created_at)->isPast();
     }
 }
