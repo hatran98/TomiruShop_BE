@@ -50,6 +50,8 @@ use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
 use Marvel\Http\Controllers\PDFController;
 use Marvel\Http\Controllers\CardController;
+use Marvel\Http\Controllers\AccountTomiruController;
+
 // use Illuminate\Support\Facades\Auth;
 
 /**
@@ -64,7 +66,9 @@ Route::post('/generate-pdf',[PDFController::class, 'generatePdf']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
 
 Route::post('/register', [UserController::class, 'register']);
+Route::post('/account', [AccountTomiruController::class, 'login']);
 Route::post('/token', [UserController::class, 'token']);
+
 Route::post('/logout', [UserController::class, 'logout']);
 Route::post('/forget-password', [UserController::class, 'forgetPassword']);
 Route::post('/verify-forget-password-token', [UserController::class, 'verifyForgetPasswordToken']);
