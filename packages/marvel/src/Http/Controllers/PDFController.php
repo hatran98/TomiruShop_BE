@@ -237,7 +237,6 @@ class PDFController extends CoreController
 
     private function sendEmailWithPdf($email,$pdf, $card_serial)
     {
-
         // Lấy key trong env
         $key = env('CREATE_TOKEN_KEY');
         $iv = env('CREATE_TOKEN_IV');
