@@ -22,16 +22,6 @@ class AccountTomiruController extends CoreController
         $processedData = $this->accountTomiruRepository->processLogin($token , $user_id , $sceret);
         return $processedData;
     }
-    public function checklogin(Request $request)
-    {
-        $loginData = $this->accountTomiruRepository->checkLogin($request->query());
-
-        if ($loginData['userData'] !== null) {
-            return redirect($loginData['redirectUrl'])->with('userData', $loginData['userData']);
-        } else {
-            return redirect($loginData['redirectUrl']);
-        }
-    }
 
 
 }

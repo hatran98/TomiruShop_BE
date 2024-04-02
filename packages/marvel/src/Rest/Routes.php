@@ -48,11 +48,8 @@ use Marvel\Http\Controllers\RefundPolicyController;
 use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
-use Marvel\Http\Controllers\PaymentTomxuController;
-use Marvel\Http\Controllers\ServiceTomxuController;
-use Marvel\Http\Controllers\AccountTomiruController;
-use Marvel\Http\Controllers\SendEmailController;
-
+use Marvel\Http\Controllers\PDFController;
+use Marvel\Http\Controllers\CardController;
 // use Illuminate\Support\Facades\Auth;
 
 /**
@@ -62,12 +59,10 @@ use Marvel\Http\Controllers\SendEmailController;
  */
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
-
-Route::post('/email/resend', [SendEmailController::class, 'sendEmail']);
-//Route::post('/otp/verify', [SendEmailController::class, 'verifyOtp']);
+Route::post('/created-key',[CardController::class, 'createtoken']);
+Route::post('/generate-pdf',[PDFController::class, 'generatePdf']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
-Route::post('/account', [AccountTomiruController::class, 'login' ]);
-Route::get('/account', [AccountTomiruController::class, 'checklogin' ]);
+
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/token', [UserController::class, 'token']);
 Route::post('/logout', [UserController::class, 'logout']);
@@ -202,12 +197,6 @@ Route::apiResource('flash-sale', FlashSaleController::class, [
 Route::resource('refund-policies', RefundPolicyController::class, [
     'only' => ['index', 'show'],
 ]);
-
-
-
-//Route::post('payment-order-tomxu', [PaymentOrderTomxuController::class, 'transaction']);
-
-
 
 /**
  * ******************************************
@@ -376,7 +365,7 @@ Route::group(
         Route::apiResource('shops', ShopController::class, [
             'only' => ['store', 'update', 'destroy'],
         ]);
-//         Route::get('analytics', [AnalyticsController::class, 'analytics']);
+        // Route::get('analytics', [AnalyticsController::class, 'analytics']);
         Route::apiResource('withdraws', WithdrawController::class, [
             'only' => ['store', 'index', 'show'],
         ]);
@@ -425,7 +414,7 @@ Route::group(
 
 Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sanctum']], function () {
     // Route::get('messages/get-conversations/{shop_id}', [ConversationController::class, 'getConversationByShopId']);
-//     Route::get('analytics', [AnalyticsController::class, 'analytics']);
+    // Route::get('analytics', [AnalyticsController::class, 'analytics']);
     Route::apiResource('types', TypeController::class, [
         'only' => ['store', 'update', 'destroy'],
     ]);
