@@ -53,7 +53,8 @@ class SendEmailController extends CoreController
             'type' => $type,
             'user_id' => $userId,
             'otp' => $otp,
-            'expires_at' => $expiresAt
+            'created_at' => now(),
+            'updated_at' => now()
         ]);
     }
 

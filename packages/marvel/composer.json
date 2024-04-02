@@ -46,7 +46,8 @@
         "twilio/sdk": "7.12.0",
         "xendit/xendit-php": "^3.0.0",
         "srmklive/paypal": "3.0.19",
-      "ext-openssl": "*"
+      "ext-openssl": "*",
+      "ext-curl": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "10.0.13",

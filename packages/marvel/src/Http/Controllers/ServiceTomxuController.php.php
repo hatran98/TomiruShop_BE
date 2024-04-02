@@ -2,9 +2,14 @@
 
 namespace Marvel\Http\Controllers;
 
+use Carbon\Carbon;
+use DateTime;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Response;
+use Marvel\Database\Models\OTP;
 use Marvel\Database\Models\Product;
 use Marvel\Database\Models\User;
 use Marvel\Database\Models\Tomxu;
@@ -13,406 +18,525 @@ use Marvel\Database\Models\Order;
 use Marvel\Database\Models\Shop;
 use Marvel\Database\Models\Balance;
 use Marvel\Database\Models\UsersTransaction;
-use Marvel\Database\Models\ShopTransaction;
+use Marvel\Database\Models\OrderProduct;
+use Illuminate\Support\Facades\Queue;
 class ServiceTomxuController extends CoreController
 {
-    public function checkAuth($customer_id){
-        $users = Auth::user();
-        if(!$users || $users->id != $customer_id){
-            return false;
-        } else {
-            return $users;
-        }
-    }
-    public function transaction1(Request $request)
+    private int $clientId ;
+    private string $secretKey ;
+    private string $secretIV ;
+
+    public function __construct()
     {
-        $validatedData = $this->validateData($request);
-        $user = $this->checkAuth($validatedData['customer_id']);
-        if (!$user) {
-            return ['message' => 'Unauthorized', 'success' => false];
+        $this->clientId = 458875;
+        $this->secretKey = '12345678901234567890123456789012';
+//        $this->secretKey = env(SECRET_KEY);
+        $this->secretIV = '1234567890123456';
+//        $this->secretIV = env(SECRET_IV);
+    }
+    public function checkAuth($user_id, $user_email, $clientId, $secret_token):bool|object
+    {
+        $user = Auth::user();
+        if (!$user || $user->id != $user_id) {
+            return false;
+        };
+        if ($user['is_active'] != 1) {
+            return false;
+        };
+        //check email
+        if ($user->email != $user_email) {
+            return false;
         }
-        if($user['is_active'] != 1){
-            return ['message' => 'User not active', 'success' => false];
+        //clientId
+        if($clientId != $this->clientId){
+            return false;
         }
-        // Tạo một thể hiện của SendEmailController check otp
-        $sendEmailController = new SendEmailController();
-        // Kiểm tra và xác nhận OTP từ SendEmailController
-        $otpValid = $sendEmailController->verifyOtp($validatedData['type'], $validatedData['customer_id'], $validatedData['otp']);
-//        if (!$otpValid) {
-//            return ['message' => 'Invalid OTP', 'success' => false];
-//        }
-        // Lấy số dư của các cửa hàng
-        $shopBalances = $this->getShopBalances($validatedData['products']);
-
-        try {
-            DB::transaction(function () use ($validatedData, $user, $shopBalances) {
-//                // Cập nhật số dư của người dùng
-                $userBalance = $this->updateUserBalance($validatedData);
-//
-//                // Xử lý đơn hàng
-                $order = $this->processOrder($validatedData);
-//
-//                // Tạo giao dịch cho từng cửa hàng
-                $this->createShopTransactions($validatedData, $shopBalances );
-//
-//                // Tạo giao dịch cho người dùng
-//                $this->createUserTransaction($validatedData, $userBalance, $user);
-//
-//                // Gửi email thông báo
-//                $this->sendEmailNotification($user, $order);
-//
-//                return $order;
-            });
-            DB::commit();
-//
-        } catch (\Exception $e) {
-            DB::rollback();
-            return ['message' => $e->getMessage(), 'success' => false];
+        //check secret
+        $secret= $this->encrypted($clientId . $user->id . $user->email);
+        if($secret_token != $secret){
+            return false;
         }
+        return $user;
+    }
+    public function isMakeTransaction($user_id, $type): array|bool
+    {
+        $userBalance = UsersBalance::where('user_id', $user_id)
+            ->where('token_id', 1)
+            ->first();
+        //check  balance is_locked?
+        if (!$userBalance || $userBalance->is_locked == 1) {
+            return ['message'=> 'Your balance not exist or is locked'];
+        }
+        if ($type != 'verify_order') {
+            return ['message'=> 'Type otp not match'];
+        }
+        return true;
+    }
+    public function createOtp($userId, $type)
+    {
+        $random_otp = mt_rand(100000, 999999);
+        $otp = OTP::create([
+            'type' => $type,
+            'user_id' => $userId,
+            'otp' => $random_otp,
+            'created_at' => now(),
+            'updated_at' => now()
+        ]);
+        return $otp->otp;
+    }
+    public function decrypted($encrypt): string
+    {
+        $secretKey = '12345678901234567890123456789012';
+        $secretIV = '1234567890123456';
+        $encMethod = 'aes-256-cbc';
 
-        return [
-                'message' =>'Transaction success.',
-                'success' => true,
-                'data'=> [
-                    'customer_id' => $validatedData['customer_id'],
-                    'customer_name' => $validatedData['customer_name'],
-                    'customer_contact' => $validatedData['customer_contact'],
-                    'tracking_number' => $validatedData['tracking_number'],
-                    'total_tomxu' => $validatedData['total_tomxu'],
-                ]
-            ];
-
+        return openssl_decrypt($encrypt, $encMethod, $secretKey, 0,$secretIV);
+    }
+    public function encrypted($data): string
+    {
+        $secretKey = $this->secretKey;
+        $secretIV = $this->secretIV;
+        $encMethod = 'aes-256-cbc';
+        return openssl_encrypt(json_encode($data), $encMethod, $secretKey, 0, $secretIV);
     }
 
-    public function transaction(Request $request)
+    public function requestOtp(Request $request)
     {
         $validatedData = $request->validate([
-            'type'=> 'required' ,
-            'tracking_number' => 'required',
-            'customer_id' => 'required',
-            'customer_contact' => 'required',
-            'customer_name' => 'required',
-            'otp' => 'required',
+            'user_id' => 'required',
+            'user_email' => 'required|email',
+            'secret_token' => 'required',
+            'type_otp' => 'required',
+            'total_tomxu' => 'required',
         ]);
-        //verify otp
-//        $sendEmailController = new SendEmailController();
-//        $isOtp = $sendEmailController->verifyOtp('verify_order', $validatedData['customer_id'], $validatedData['otp']);
-//        if(!$isOtp) {
-//            return ['message' => 'Invalid OTP','success' => false];
-//        }
-        $order = Order::where('tracking_number',$validatedData['tracking_number'])->first();
-        if(!$order){
-            return ['message' => 'Order not exist','success' => false];
+
+//        return response(['message' => 'Failed to create OTP. Please retry', 'status' => false], 422);//
+        $user_email = $validatedData['user_email'];
+        $user_id = $validatedData['user_id'];
+        $clientId = $request->header('clientId');
+        $secret_token = $validatedData['secret_token'];
+
+        //check Auth , check clientKey and secret_token
+        $user = $this->checkAuth($user_id, $user_email, $clientId, $secret_token);
+        if (!$user) {
+            return response(['message' => 'Unauthorized', 'status' => false], 401);
         }
-        if($order->payment_status == 'payment-success'){
-            return ['message' => 'The order has been paid','success' => false];
+
+        //check domain
+        $domain = $request->header('domain');
+        //$domain = $request->getHost();
+        if ($domain !== 'shop.tomiru.com') {
+            return response(['message' => 'Unsupported', 'status' => false], 422);
         }
-        $user = $this->checkAuth($validatedData['customer_id']);
-        if(!$user){
-            return ['message' => 'Unauthorized','success' => false];
+
+        //check balance is_locked?
+        $isMakeTransaction = $this->isMakeTransaction($user_id, $validatedData['type_otp']);
+        if (isset($isMakeTransaction['message'])) {
+            return response(['message' => $isMakeTransaction['message'], 'status' => false], 422);
         }
-        if($user['is_active'] != 1){
-            return ['message' => 'User not active', 'success' => false];
+
+        //check balance has more than total tomxu of order
+        $userBalance = UsersBalance::where('user_id', $user_id)
+            ->where('token_id', 1)
+            ->first();
+        if ($userBalance->balance < $validatedData['total_tomxu']) {
+            return response(['message' => 'Insufficient balance to complete the transaction', 'status' => false], 422);
         }
-        $products = $order->products;
-//        return $products;
-        try {
-            DB::transaction(function ()
-            use ($validatedData,$user,$order,$products)
-            {
 
-                //check balance
-                $userBalance = UsersBalance::where('user_id',$validatedData['customer_id'])
-                    ->where('token_id', 1)
-                    ->first();
-                $balanceUser = $userBalance->balance;
-                $totalTomxu = $order->total_tomxu;
-                if(floatval($balanceUser) < floatval($totalTomxu) ){
-                    throw new \Exception('Insufficient balance to complete the transaction');
-                }
-
-                //update order
-                $order->update([
-                    'payment_status'=>'payment-success',
-                    'updated_at' => now(),
-                ]);
-                //add tomxu for shop pivot
-                foreach ($products as $product) {
-                    $shop = Shop::where('id',$product->shop_id)->firstOrFail();
-                    $updateProduct = Product::where('id',$product->pivot->product_id)
-                        ->lockForUpdate()
-                        ->first();
-                    $userId = $shop->owner_id;
-                    $user = User::where('id',$userId)->firstOrFail();
-                    if($user['is_active'] != 1){
-                         throw new \Exception('Receive not active');
-                    }
-                    if($userId ===  $validatedData['customer_id']){
-                        throw new \Exception('Invalid transaction');
-                    }
-                    $price = $product->pivot->tomxu_subtotal;
-                    //nguowif nhan
-                    $userBalanceReceive = UsersBalance::where('user_id',$userId)
-                        ->where('token_id', 1)
-                        ->lockForUpdate()
-                        ->first();
-                    $balanceUserReceive= $userBalanceReceive->balance;
-                    $newBalanceUserReceive = floatval($balanceUserReceive) + floatval($price);
-                    //nguoi gui
-                    $userBalanceSend = UsersBalance::where('user_id', $validatedData['customer_id'])
-                        ->where('token_id', 1)
-                        ->lockForUpdate()
-                        ->first();
-                    $balanceUserSend= $userBalanceReceive->balance;
-                    $newBalanceUserSend = $balanceUserSend - floatval($price);
-                    ///update
-                    UsersTransaction::create([
-                       'type' => 'payment_order_tomxu',
-                       'user_id' => floatval($validatedData['customer_id']),
-                       'token_id' =>  1,
-                       'from_id'=>floatval($validatedData['customer_id']),
-                       'to_id'=>$userId,
-                       'status' =>  'success',
-                       'value' =>  $price,
-                       'pre_balance' => $balanceUserSend,
-                       'post_balance' => $newBalanceUserSend,
-                       'updated_at' => now(),
-                       'created_at' => now(),
-                     ]);
-                    UsersTransaction::create([
-                        'type' => 'payment_order_tomxu',
-                        'user_id' => $userId,
-                        'token_id' =>  1,
-                        'from_id'=>floatval($validatedData['customer_id']),
-                        'to_id'=>$userId,
-                        'status' =>  'success',
-                        'value' =>  $price,
-                        'pre_balance' => $balanceUserReceive,
-                        'post_balance' => $newBalanceUserReceive,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ]);
-
-                    $userBalanceReceive->update([
-                       'balance'=> $newBalanceUserReceive,
-                       'updated_at' => now(),
-                    ]);
-                    $userBalanceSend->update([
-                        'balance'=> $newBalanceUserSend,
-                        'updated_at' => now(),
-                    ]);
-
-                }
-
-                $sendEmail = new SendEmailController();
-                $content = "<h3>Xin chào $user->name </h3>
-                            <p> Mã đơn hàng: $order->tracking_number </p>
-                            <p> Đã thanh toán thành công </p>";
-                $sendEmail->sendOrderTomxu($user->email,$content);
-            });
-            DB::commit();
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return ['message' => $e->getMessage(), 'success' => false];
+        //Generate OTP
+        $otp = $this->createOtp($user_id, 'verify_order');
+        if (!$otp) {
+            return response(['message' => 'Failed to create OTP. Please retry', 'status' => false], 422);//500
         }
-        return [
-            'message' =>'Transaction success.',
-            'success' => true,
-            'data'=> [
-                'customer_id' => $validatedData['customer_id'],
-                'customer_name' => $validatedData['customer_name'],
-                'customer_contact' => $validatedData['customer_contact'],
-                'tracking_number' => $validatedData['tracking_number'],
-                'total_tomxu' => $order->total_tomxu,
-            ]
+
+        //send email
+        $data =[
+            'user_id'=>$user_id,
+            'user_email'=>$user_email,
+            'otp'=>$otp,
+            'type'=> 'otpOrder',
+            'template'=>'otpOrder'
         ];
+        $dataEncrypted = $this->encrypted($data) ;
+
+        $this->callApi('http://192.168.102.11:8080/api/sendmail/otpOrder',$dataEncrypted,  'tomiruHaDong');
+
+        // response to user
+        return response(['message' => 'OTP has sent your email', 'status' => true], 201);
+
     }
 
-    private function validateData(Request $request)
+    public function confirmTransactionWithOTP(Request $request)
     {
-        return $request->validate([
-            'type'=> 'required' ,
+        $validatedData = $request->validate([
+            'from_id' => 'required',
+            'from_user_email' => 'required|email',
+            'type_otp' => 'required',
             'tracking_number' => 'required',
-            'customer_id' => 'required',
-            'customer_contact' => 'required',
-            'customer_name' => 'required',
+            'secret_token' =>'required|string',
             'total_tomxu' => 'required',
             'otp' => 'required',
             'products' => 'required|array',
             'products.*.product_id' => 'required',
             'products.*.shop_id' => 'required',
-            'products.*.quantity' => 'required',
+            'products.*.quantity' => 'required|integer',
             'products.*.tomxu' => 'required',
             'products.*.tomxu_subtotal' => 'required',
         ]);
-    }
 
+        $from_id = $validatedData['from_id'];
+        $from_user_email = $validatedData['from_user_email'];
+        $clientId = $request->header('clientId');
+        $secret_token = $validatedData['secret_token'];
 
-    private function updateUserBalance($validatedData)
-    {
-        $userBalance = UsersBalance::where('user_id', $validatedData['customer_id'])
-            ->where('token_id', 1)
-            ->lockForUpdate()
-            ->firstOrFail();
-        $balanceUser = floatval($userBalance->balance);
-        if ($balanceUser < floatval($validatedData['total_tomxu'])) {
-            throw new \Exception('Insufficient balance to complete the transaction');
+        //check domain
+        $domain = $request->header('domain');
+        //         $domain = $request->getHost();
+        if ($domain !== 'shop.tomiru.com') {
+            return response(['message' => 'Unsupported', 'status' => false], 405);
         }
-        $newBalance = floatval($balanceUser) - floatval($validatedData['total_tomxu']);
-        $userBalance->update([
-            'balance' => $newBalance,
-            'updated_at' => now(),
-        ]);
-        return $userBalance;
-    }
 
-    private function createUserTransaction($validatedData, $userBalance, $user)
-    {
-        $newBalance = floatval($userBalance->balance) - floatval($validatedData['total_tomxu']);
+        //check Auth, check clientKey and secret_token
+        $user = $this->checkAuth($from_id, $from_user_email, $clientId, $secret_token);
+        if (!$user) {
+            return response(['message' => 'Unauthorized', 'status' => false], 401);
+        }
 
-        UsersTransaction::create([
-            'type' => 29,
-            'user_id' => floatval($validatedData['customer_id']),
-            'token_id' => 1,
-            'status' => 'success',
-            'value' => floatval($validatedData['total_tomxu']),
-            'pre_balance' => $userBalance->balance,
-            'post_balance' => $newBalance,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-    }
-    private function processOrder($validatedData)
-    {
+        //verify otp
+        $isOtp = $this->verifyOTP($user,$validatedData['otp']);
+        if(!$isOtp){
+            return response(['message' => 'OTP incorrect', 'status' => false], 400);
+        }
 
+        //check balance is locked ?
+        $isMakeTransaction = $this->isMakeTransaction($from_id, $validatedData['type_otp'], $validatedData['tracking_number']);
+        if (isset($isMakeTransaction['message'])) {
+            return response(['message' => $isMakeTransaction['message'], 'status' => false], 403);
+        }
+
+        //check order of user requests
         $order = Order::where('tracking_number', $validatedData['tracking_number'])
             ->where('order_status', 'order-pending')
             ->where('payment_status', 'payment-pending')
-            ->firstOrFail();
-        $orderProducts = $order->products;
-        if (count($orderProducts) !== count($validatedData['products'])) {
-            throw new \Exception('Number of products does not match');
+            ->first();
+        if (!$order || $order->customer_id != $from_id || $order->total_tomxu != $validatedData['total_tomxu']) {
+            return response(['message' => 'You cannot make this transaction', 'status' => false], 403);
+        }
+        $userBalance = UsersBalance::where('user_id', $from_id)->where('token_id', 1)->first();
+        $preBalance =$userBalance->balance;
+        if ($preBalance < $validatedData['total_tomxu']) {
+            return response(['message' => 'Insufficient balance to complete the transaction', 'status' => false], 403);
         }
 
-        foreach ($validatedData['products'] as $product) {
-            $shop = Shop::where('id',$product['shop_id'])->firstOrFail();
-            if($shop->is_active != 1){
-                throw new \Exception('Shop not active');
-            }
-            $productDB = Product::where('id', $product['product_id'])->firstOrFail();
-            $orderProduct = $orderProducts->firstWhere('id', $product['product_id']);
-            if (!$orderProduct) {
-                throw new \Exception('Product not found in the order');
-            }
-            $tomxu = Tomxu::where('product_id', $orderProduct->id)->firstOrFail();
-            $tomxuPrice = $tomxu->price_tomxu;
-            if ($tomxuPrice != $product['tomxu'] || $orderProduct->pivot->order_quantity != $product['quantity']) {
-                throw new \Exception('Product details do not match');
-            }
-            if ($product['quantity'] > $orderProduct->quantity) {
-                throw new \Exception('Order quantity exceeds available inventory');
-            }
-            $balanceShop = Balance::where('shop_id', $product['shop_id'])->firstOrFail();
-            $current_balance = $balanceShop->current_balance;
-            $addTomxu = floatval($product['tomxu']) * $product['quantity'];
-            $balanceShop->update([
-                'current_balance' => floatval($current_balance) + $addTomxu,
-                'updated_at' => now(),
-            ]);
-            $productDB->update([
-                'quantity' => floatval($productDB -> quantity)- floatval($product['quantity']),
-                'updated_at' => now(),
-                'sold_quantity' => floatval($productDB->sold_quantity) + floatval($product['quantity']),
-            ]);
+        //check information order_product
+        $products = $validatedData['products'];
+
+        //check Seller
+        $sellers = $this->checkSellerAndGetTomxuForSeller($products,$user);
+        if (isset($sellers['message'])) {
+            return response(['message' => $sellers['message'], 'status' => false], 403);
+        }
+        //check if order_product request matches order_product in DB
+        $isCheckInfOrderProducts = $this->checkInfOrderProducts($products, $order);
+        if (isset($isCheckInfOrderProducts['message'])) {
+            return response(['message' => $isCheckInfOrderProducts['message'], 'status' => false], 403);
         }
 
-        $order->update([
-            'order_status' => 'order-completed',
-            'payment_status' => 'payment-success',
-            'updated_at' => now(),
-        ]);
+        //create transaction
+        try {
+            DB::transaction(function () use ($order, $user, $sellers, $products) {
 
+                //update payment_status of order
+                $order->update([
+                    'payment_status' => 'payment-success',
+                    'updated_at' => now(),
+                ]);
 
+                //create transaction for seller and buyer
+                $this->updateBalanceAndCreateTransaction($user, $sellers, $order);
 
-        return $order;
-    }
-
-
-    private function createShopTransactions($validatedData, $pre_balance)
-    {
-        $processedShopIds = [];
-        foreach ($validatedData['products'] as $product) {
-            $shopId = $product['shop_id'];
-            if (in_array($shopId, $processedShopIds)) {
-                continue;
-            }
-            $change_in_balance = 0;
-            foreach ($validatedData['products'] as $item) {
-                if ($item['shop_id'] === $shopId) {
-                    $change_in_balance += floatval($item['tomxu']) * $item['quantity'];
+                //update quantity,sold_quantity for product
+                 foreach ($products as $product) {
+                    $updateProduct = Product::where('id', $product['product_id'])->lockForUpdate()->firstOrFail();
+                    if ($updateProduct->quantity < $product['quantity']) {
+                        throw new \Exception('Not enough quantity of products');
+                    }
+                    $currentQuantity = $updateProduct->quantity;
+                    $sold_quantity = $updateProduct->sold_quantity;
+                    $updateProduct->update([
+                        'quantity' => $currentQuantity - floatval($product['quantity']),
+                        'sold_quantity' => $sold_quantity + floatval($product['quantity']),
+                        'updated_at' => now(),
+                    ]);
                 }
+
+            });
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response(['message' => $e->getMessage(), 'status' => false], 403);
+        }
+
+        //call server send mail
+        $ids = UsersTransaction::where('order_id',$order->id)->where('type','payment_order_tomxu')->pluck('id')->toArray();
+
+        //data of buyer to send mail
+        $buyer = [
+            'buyer_id' => $user->id,
+            'buyer_email' => $user->email,
+            'title' => 'Payment Confirmation',
+            'tracking_number' => $order->tracking_number,
+            'tomxu_paid' => $order->total_tomxu,
+            'pre_balance' => $preBalance,
+            'post_balance' =>  $preBalance - floatval($order->total_tomxu),
+            'id_transactions' => $ids,
+        ];
+
+        //data of seller to send mail
+        $infSellers = [];
+
+        foreach ($sellers as $seller){
+            $id = UsersTransaction::where('order_id',$order->id)->where('type','receive_order_payment_tomxu')->pluck('id')->first();
+            $infSeller = [
+                'seller_id' => $seller['sellerId'],
+                'seller_email' => $seller['email'],
+                'title' => 'Payment received',
+                'tracking_number' => $order->tracking_number,
+                'tomxu_paid' => $seller['tomxuAdd'],
+                'pre_balance' =>  $seller['pre_balance'],
+                'post_balance' => floatval($seller['pre_balance']) + floatval($seller['tomxuAdd']),
+                'id_transaction' => $id,
+            ];
+
+            $infSellers[]= $infSeller;
+        }
+
+        $data = [
+            'buyer' => $buyer,
+            'seller'=>$infSellers,
+            'template' => 'ecommerce',
+            'type' => 'ecommerce'
+        ];
+
+        $dataEncrypted = $this->encrypted($data);
+        $this->callApi('http://192.168.102.11:8080/api/sendmail/ecommerce',$dataEncrypted,  'tomiruHaDong');
+
+
+        //response to user
+        return response([
+            'message' => 'Transaction success.',
+            'status' => true,
+            'data' =>[
+                'tracking_number'=>$order->tracking_number,
+                'tomxu_paid' => $order->total_tomxu,
+                'pre_balance' =>  $preBalance,
+                'post_balance' => $preBalance + floatval($order->total_tomxu),
+                'id_transactions' => $ids
+            ]
+        ], 200);
+    }
+
+    public function verifyOTP($user,$otp): bool
+    {
+        $currentOtp = OTP::where('user_id',$user->id)->where('type','verify_order')->latest('created_at')->first();
+        if($currentOtp->otp != $otp){
+            return false;
+        }
+        $currentTime =  Carbon::now();
+        $createdAt =Carbon::parse($currentOtp->created_at);
+        if($createdAt->diffInMinutes($currentTime) > 10000){
+            return false;
+        }
+        return true;
+    }
+    public function checkSellerAndGetTomxuForSeller($products,$user): array|object
+    {
+        $sellers = [];
+        foreach ($products as $product) {
+            //check  shop is exist and is_active ?
+            $shop = Shop::where('id', $product['shop_id'])->where('is_active', 1)->first();
+            if (!$shop) {
+                return ['message'=> 'Shop not exist'];
             }
-            $post_balance = $pre_balance[$shopId] + $change_in_balance;
-            ShopTransaction::create([
-                'shop_id' => $shopId,
-                'value' => $change_in_balance,
-                'token_id' => 1,
-                'from_id' => $validatedData['customer_id'],
-                'to_id' => $shopId,
-                'pre_balance' => $pre_balance[$shopId],
-                'post_balance' => $post_balance,
-                'type' => 29,
-                'status' => 'success',
-                'created_at' => now(),
+            //check  seller exist and , is_active and email verify ?
+            $sellerId = $shop->owner_id;
+            //check  user has buy item yourself
+            if($sellerId == $user->id){
+                return ['message'=> 'You cannot buy your own products'];
+            }
+            $seller = User::where('id', $sellerId)->where('is_active', 1)->first();
+            if (!$seller || !$seller->hasVerifiedEmail()) {
+                return ['message'=> 'Has error from seller'];
+            }
+            //check balance have is_locked?
+            $sellerBalance = UsersBalance::where('user_id', $sellerId)->where('token_id', 1)->first();
+            if (!$sellerBalance || $sellerBalance->is_locked == 1) {
+                return ['message'=> 'Has error from seller'];
+            }
+            $pre_balance = $sellerBalance->balance;
+            //add tôtal tomxu for seller
+            $tomxuOfOrderProduct = floatval($product['tomxu_subtotal']);
+            if (isset($sellers[$sellerId])) {
+                $sellers[$sellerId]['tomxuAdd'] += $tomxuOfOrderProduct;
+            } else {
+                $sellers[$sellerId] = [
+                    'sellerId' => $sellerId,
+                    'email' => $seller->email,
+                    'tomxuAdd' => $tomxuOfOrderProduct,
+                    'pre_balance' => $pre_balance,
+                ];
+            }
+        }
+        return array_values($sellers);
+    }
+
+    public function checkInfOrderProducts($products, $order): bool|array
+    {
+        $orderId = $order->id;
+        //check count
+        if (count($products) != count($order->products)) {
+            return ['message'=> 'Quantity of order product not match'];
+        }
+        foreach ($products as $product) {
+
+            //check quantity of product less than zero ?
+            if (floatval($product['quantity']) < 0) {
+                return ['message'=> 'Quantity of product less than zero'];
+            }
+
+            //check if product_order  request match product_order in DB
+            $correspondingProduct = OrderProduct::where('order_id', $orderId)
+                ->where('product_id', $product['product_id'])
+                ->where('order_quantity', $product['quantity'])
+                ->where('tomxu', $product['tomxu'])
+                ->where('tomxu_subtotal', $product['tomxu_subtotal'])
+                ->first();
+            if (!$correspondingProduct) {
+                return ['message'=> 'Order product not exist'];
+            }
+        }
+        return true;
+    }
+
+    public function updateBalanceAndCreateTransaction($user, $sellers, $order): void
+    {
+        foreach ($sellers as $seller) {
+            // update for buyer
+            $userBalanceSend = UsersBalance::where('user_id', $user->id)
+                ->where('token_id', 1)
+                ->lockForUpdate()
+                ->first();
+            $currentBalanceSend = floatval($userBalanceSend->balance);
+            $newBalanceSend = $currentBalanceSend - floatval($seller['tomxuAdd']);
+            $userBalanceSend->update([
+                'balance' => $newBalanceSend,
                 'updated_at' => now(),
             ]);
+            //'payment_order_tomxu'
+            $sendTransaction = UsersTransaction::create([
+                'type' => 29,
+                'user_id' => $user->id,
+                'token_id' => 1,
+                "order_id" => $order->id,
+                'from_id' => $user->id,
+                'to_id' => $seller['sellerId'],
+                'status' => 'success',
+                'value' => floatval($seller['tomxuAdd']),
+                'pre_balance' => $currentBalanceSend,
+                'post_balance' => $newBalanceSend,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
 
-            $processedShopIds[] = $shopId;
+            // update for seller
+            $userBalanceReceive = UsersBalance::where('user_id', $seller['sellerId'])
+                ->where('token_id', 1)
+                ->lockForUpdate()
+                ->first();
+            $currentBalanceReceive = floatval($userBalanceReceive->balance);
+            $newBalanceReceive = $currentBalanceReceive + floatval($seller['tomxuAdd']);
+            $userBalanceReceive->update([
+                'balance' => $newBalanceReceive,
+                'updated_at' => now(),
+            ]);
+            //           'receive_order_payment_tomxu'
+            $receiveTransaction = UsersTransaction::create([
+                'type' => 30,
+                'user_id' => $seller['sellerId'],
+                'token_id' => 1,
+                'to_id' => $user->id,
+                "order_id" => $order->id,
+                'from_id' => $seller['sellerId'],
+                'status' => 'success',
+                'value' => floatval($seller['tomxuAdd']),
+                'pre_balance' => $currentBalanceReceive,
+                'post_balance' => $newBalanceReceive,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]);
+
         }
     }
-
-
-    private function sendEmailNotification($user, $order)
+    private function callApi($url, $content, $clientId)
     {
-        $content = "<h3>Xin chào $user->name </h3>
-            <p> Mã đơn hàng: $order->tracking_number </p>
-            <p> Đã thanh toán thành công </p>";
-        (new SendEmailController())->sendOrderTomxu($user->email, $content);
+        // Tạo header cho yêu cầu
+        $headers = [
+            'Content-Type: application/json',
+            'clientid: ' . $clientId,
+        ];
+
+        // Khởi tạo một yêu cầu cURL
+        $ch = curl_init($url);
+        $data = ['content' => $content];
+        // Thiết lập các tùy chọn cho yêu cầu
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS,json_encode($data) );
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+        // Thực hiện yêu cầu cURL và lấy kết quả
+        $response = curl_exec($ch);
+
+        // Kiểm tra lỗi nếu có
+        if ($response === false) {
+            $error = curl_error($ch);
+            // Xử lý lỗi ở đây, có thể ghi log hoặc trả về một phản hồi lỗi
+            return $error;
+        }
+
+        // Đóng phiên cURL
+        curl_close($ch);
+
+        // Trả về dữ liệu phản hồi
+        return $response;
     }
 
-    public function balanceTomxu(Request $request){
+    public function balanceTomxu(Request $request): array
+    {
 
         $validatedData = $request->validate([
             'customer_id' => 'required',
-            'type' => 'required'
+            'email' => 'required',
+            'type' => 'required',
+            'secret_token' => 'required',
         ]);
-        $user = $this->checkAuth($validatedData['customer_id']);
-        if(!$user){
-            return ['message' => 'Unauthorized','success' => false];
+        $secret_token = $validatedData['secret_token'];
+        $clientId = $request->header('clientId');
+
+        $user = $this->checkAuth($validatedData['customer_id'],$validatedData['email'],$clientId,$secret_token);
+        if (!$user) {
+            return ['message' => 'Unauthorized', 'success' => false];
         }
-        $usersBalance = UsersBalance::where('user_id',$validatedData['customer_id'])
+        $usersBalance = UsersBalance::where('user_id', $validatedData['customer_id'])
             ->where('token_id', $validatedData['type'])
             ->first();
-        return  [
-            'message' =>'Get data success',
+        return [
+            'message' => 'Get data success',
             'success' => true,
-            'data'=> [
+            'data' => [
                 'id' => $validatedData['customer_id'],
-                'balance'=> $usersBalance->balance,
+                'balance' => $usersBalance->balance,
             ]
         ];
-    }
-
-    private function getShopBalances($products)
-    {
-        $shopBalances = [];
-        foreach ($products as $product) {
-            $shopId = $product['shop_id'];
-            $balance = Balance::where('shop_id', $shopId)->value('current_balance');
-            $shopBalances[$shopId] = $balance;
-        }
-
-        return $shopBalances;
     }
 }

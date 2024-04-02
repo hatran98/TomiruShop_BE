@@ -219,7 +219,10 @@ Route::post('free-downloads/digital-file', [DownloadController::class, 'generate
 
 Route::group(['middleware' => ['can:' . Permission::CUSTOMER, 'auth:sanctum', 'email.verified']], function () {
     Route::post('transaction-tomxu', [PaymentTomxuController::class, 'transaction']);
-    Route::post('payment-order-tomxu', [ServiceTomxuController::class, 'transaction']);
+
+    Route::post('request-otp', [ServiceTomxuController::class, 'requestOtp']);
+    Route::post('payment/tomxu', [ServiceTomxuController::class, 'confirmTransactionWithOTP']);
+
     Route::post('balance-tomxu', [ServiceTomxuController::class, 'balanceTomxu']);
 
     Route::post('/update-email', [UserController::class, 'updateUserEmail']);
