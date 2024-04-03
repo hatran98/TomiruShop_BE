@@ -55,7 +55,7 @@ class UserOtpCard extends Model
             'expire_at' => $this->expire_at,
         ];
 
-        return Crypt::encrypt(json_encode($toEncryptData));
+        return Crypt::encrypt($toEncryptData);
     }
 
 
@@ -64,7 +64,7 @@ class UserOtpCard extends Model
     {
         $a = $this->generateCardToken();
         $b = $this->card_token;
-        return $a = $b
+        return $a == $b
             && !$this->isExpired()
             && $this->isActive();
     }
