@@ -49,9 +49,7 @@ use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
 use Marvel\Http\Controllers\PDFController;
-use Marvel\Http\Controllers\CardController;
 use Marvel\Http\Controllers\AccountTomiruController;
-// use Illuminate\Support\Facades\Auth;
 
 /**
  * ******************************************
