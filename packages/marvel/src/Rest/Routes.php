@@ -27,6 +27,7 @@ use Marvel\Http\Controllers\MessageController;
 use Marvel\Http\Controllers\OrderController;
 use Marvel\Http\Controllers\PaymentIntentController;
 use Marvel\Http\Controllers\PaymentMethodController;
+use Marvel\Http\Controllers\PaymentTomxuController;
 use Marvel\Http\Controllers\ProductController;
 use Marvel\Http\Controllers\QuestionController;
 use Marvel\Http\Controllers\RefundController;
@@ -51,6 +52,7 @@ use Marvel\Http\Controllers\TermsAndConditionsController;
 use Marvel\Http\Controllers\PDFController;
 use Marvel\Http\Controllers\CardController;
 use Marvel\Http\Controllers\AccountTomiruController;
+use Marvel\Http\Controllers\ServiceTomxuController;
 
 // use Illuminate\Support\Facades\Auth;
 
