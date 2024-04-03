@@ -2,6 +2,10 @@
 
 namespace Marvel\Http\Controllers;
 
+use Dompdf\Dompdf;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Marvel\Database\Models\OTPCard;
 use Marvel\Database\Models\UserCardOtpToken;
 use Marvel\Database\Models\UserOtpCard;
 use Illuminate\Http\Request;
@@ -10,8 +14,22 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Marvel\Database\Models\User;
 use Illuminate\Support\Facades\DB;
+use Marvel\Database\Repositories\UserOtpCardRepository;
+use Marvel\Database\Repositories\UserCardOtpTokenRepository;
+
 class CardController extends CoreController
 {
+
+    public UserOtpCardRepository $repository;
+
+    public UserCardOtpTokenRepository $tokenRepository;
+
+    public function __construct(UserOtpCardRepository $repository, UserCardOtpTokenRepository $tokenRepository)
+    {
+        $this->repository = $repository;
+        $this->tokenRepository = $tokenRepository;
+    }
+
     public function createdCard()
     {
         // Lấy serial cuối cùng từ cơ sở dữ liệu
@@ -60,6 +78,48 @@ class CardController extends CoreController
             // Tăng giá trị của serialNumber để tạo serial tiếp theo
             $serialNumber++;
         }
+    }
+
+    public function verify(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'customer_id' => 'required',
+                'method' => 'required',
+                'stt' => 'required',
+                'token' => 'required',
+            ]);
+
+            $result = $this->repository->verifyOTP($validatedData);
+            if ($result) {
+                return response("success", 200);
+            } else {
+                return response("cannot verify otp", 422);
+            }
+        } catch (ValidationException $e) {
+            return response($e->getMessage(), 422);
+        } catch (\Exception $e) {
+            return response($e->getMessage(), 403);
+        }
+    }
+
+    public function bind(Request $request)
+    {
+        try {
+            $validatedData = $request->validate([
+                'customer_id' => 'required',
+                'serial' => 'required',
+            ]);
+
+            return $this->repository->bind($validatedData['customer_id'], $validatedData['serial']);
+        } catch (ValidationException $e) {
+            return response($e->getMessage(), 422);
+        }
+    }
+
+    public function showCards(Request $request)
+    {
+        return $this->repository->showCards();
     }
 
 }
