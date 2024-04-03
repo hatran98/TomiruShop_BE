@@ -200,6 +200,13 @@ class PDFController extends CoreController
         return json_decode($response->getContent(), true)['card_serial'];
     }
 
+    private function createPdfDirectoryIfNeeded()
+    {
+        $pdfDirectory = storage_path('app/pdf');
+        if (!file_exists($pdfDirectory)) {
+            mkdir($pdfDirectory, 0777, true);
+        }
+    }
 
     private function createPdfWithPassword($card_serial,$otpData, $password)
     {
@@ -227,13 +234,6 @@ class PDFController extends CoreController
         return $pdfWithPasswordPath;
     }
 
-    private function createPdfDirectoryIfNeeded()
-    {
-        $pdfDirectory = storage_path('app/pdf');
-        if (!file_exists($pdfDirectory)) {
-            mkdir($pdfDirectory, 0777, true);
-        }
-    }
 
     private function sendEmailWithPdf($email,$pdf, $card_serial)
     {
@@ -249,7 +249,7 @@ class PDFController extends CoreController
                 'email' => $email,
                 'subject' => 'Kích hoạt thẻ thành công',
                 'htmlBody' => 'Mã số thẻ : ' . $card_serial . ' đã được kích hoạt thành công </br> Vui lòng xem mã OTP của thẻ trong file pdf đính kém',
-                'attachment' => base64_encode($pdf),
+                'attachment' => base64_encode(file_get_contents($pdf)),
                 'type' => 'pdf'
             ];
 
