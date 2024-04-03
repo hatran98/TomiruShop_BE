@@ -29,6 +29,10 @@ class SampleEmail extends Mailable
             return $this->subject('Your transaction')
                 ->html($this->content);
         }
+        if($this->content->title){
+            return $this->subject($this->content->title)
+                ->html($this->content->content);
+        }
     }
 
     public function buildOtherContent($content)

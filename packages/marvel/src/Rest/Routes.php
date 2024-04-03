@@ -49,6 +49,7 @@ use Marvel\Http\Controllers\RefundReasonController;
 use Marvel\Http\Controllers\StoreNoticeController;
 use Marvel\Http\Controllers\TermsAndConditionsController;
 use Marvel\Http\Controllers\PDFController;
+use Marvel\Http\Controllers\CardController;
 use Marvel\Http\Controllers\AccountTomiruController;
 
 /**
@@ -63,7 +64,9 @@ Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])-
 Route::post('/account' , [AccountTomiruController::class, 'login']);
 Route::post('/login', [UserController::class, 'login']);
 Route::post('/register', [UserController::class, 'register']);
+Route::post('/account', [AccountTomiruController::class, 'login']);
 Route::post('/token', [UserController::class, 'token']);
+
 Route::post('/logout', [UserController::class, 'logout']);
 Route::post('/forget-password', [UserController::class, 'forgetPassword']);
 Route::post('/verify-forget-password-token', [UserController::class, 'verifyForgetPasswordToken']);
@@ -206,6 +209,12 @@ Route::resource('refund-policies', RefundPolicyController::class, [
 Route::post('free-downloads/digital-file', [DownloadController::class, 'generateFreeDigitalDownloadableUrl']);
 
 Route::group(['middleware' => ['can:' . Permission::CUSTOMER, 'auth:sanctum', 'email.verified']], function () {
+    Route::post('transaction-tomxu', [PaymentTomxuController::class, 'transaction']);
+
+    Route::post('request-otp', [ServiceTomxuController::class, 'requestOtp']);
+    Route::post('payment/tomxu', [ServiceTomxuController::class, 'confirmTransactionWithOTP']);
+
+    Route::post('balance-tomxu', [ServiceTomxuController::class, 'getBalanceTomxu']);
 
     Route::post('/update-email', [UserController::class, 'updateUserEmail']);
     Route::get('me', [UserController::class, 'me']);
@@ -407,7 +416,7 @@ Route::group(
 
 Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sanctum']], function () {
     // Route::get('messages/get-conversations/{shop_id}', [ConversationController::class, 'getConversationByShopId']);
-    // Route::get('analytics', [AnalyticsController::class, 'analytics']);
+//     Route::get('analytics', [AnalyticsController::class, 'analytics']);
     Route::apiResource('types', TypeController::class, [
         'only' => ['store', 'update', 'destroy'],
     ]);
