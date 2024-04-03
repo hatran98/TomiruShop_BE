@@ -62,31 +62,4 @@ class CardController extends CoreController
         }
     }
 
-
-public function createtoken(Request $request) {
-
-    $key = "12345678901234567890123456789012";
-
-// IV tùy chỉnh
-    $encIv = "1234567890123456";
-
-// Dữ liệu cần mã hóa
-   $data = $request->input('check1');
-
-// Mã hóa dữ liệu
-    $encryptedData = openssl_encrypt(json_encode($data), 'AES-256-CBC', $key, 0, $encIv);
-
-// Giải mã dữ liệu
-    $decryptedData = json_decode(openssl_decrypt($encryptedData, 'AES-256-CBC', $key, 0, $encIv), true);
-
-// In ra kết quả
-    var_dump($encryptedData, $decryptedData);
-
-    return $encryptedData;
-}
-
-
-
-
-
 }
