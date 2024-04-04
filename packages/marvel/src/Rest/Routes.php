@@ -521,8 +521,23 @@ Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sa
 Route::post('verify_card_otp', [CardController::class,'verify'])
     ->middleware(['auth:sanctum', 'can:' . Permission::CUSTOMER]);
 
-Route::get('show-otp-cards', [CardController::class,'showCards'])
-    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+Route::middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN])->group(function () {
+    Route::get('show-cards', [CardController::class, 'showExistingCards']);
+    Route::get('show-otp-cards',[CardController::class,'showCards']);
+    Route::get('show-card-detail', [CardController::class, 'showCardDetail']);
+    // Thêm các route khác tương tự nếu cần
+});
 
 Route::post('assign_card', [CardController::class,'bind'])
     ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+
+Route::post('online-card',[PDFController::class,'createCard'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+
+Route::post("hard-card", [CardController::class, 'printCard'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+
+Route::post('create-card', [CardController::class,'createCard'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+
+Route::post('update-card', [CardController::class,'updateCard']);

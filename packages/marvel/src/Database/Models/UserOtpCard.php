@@ -19,8 +19,13 @@ class UserOtpCard extends Model
         'card_token',
         'created_at',
         'updated_at',
+        'printed'
     ];
 
+    public function tokens()
+    {
+        return $this->hasMany(UserCardOtpToken::class, 'card_serial', 'serial_number');
+    }
 
     public function isExpired(): bool
     {

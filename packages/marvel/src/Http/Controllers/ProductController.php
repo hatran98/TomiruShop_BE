@@ -5,8 +5,10 @@ namespace Marvel\Http\Controllers;
 use Exception;
 use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use Marvel\Database\Models\Shop;
 use Marvel\Database\Models\Type;
 use Illuminate\Http\JsonResponse;
 use Marvel\Database\Models\Product;
@@ -91,6 +93,10 @@ class ProductController extends CoreController
             $products_query = $this->repository->processFlashSaleProducts($request, $products_query);
         }
 
+    if ($user = Auth::user()) {
+        $shop_ids = Shop::where('owner_id', $user->id)->pluck('id')->toArray();
+        $products_query = $products_query->whereNotIn('shop_id', $shop_ids);
+    }
         return $products_query;
     }
 
