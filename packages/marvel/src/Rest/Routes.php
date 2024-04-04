@@ -53,8 +53,8 @@ use Marvel\Http\Controllers\PDFController;
 use Marvel\Http\Controllers\CardController;
 use Marvel\Http\Controllers\AccountTomiruController;
 use Marvel\Http\Controllers\ServiceTomxuController;
-
 // use Illuminate\Support\Facades\Auth;
+
 
 /**
  * ******************************************
@@ -63,10 +63,10 @@ use Marvel\Http\Controllers\ServiceTomxuController;
  */
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
-Route::post('/created-key',[CardController::class, 'createtoken']);
 Route::post('/generate-pdf',[PDFController::class, 'generatePdf']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
-
+Route::post('/account' , [AccountTomiruController::class, 'login']);
+Route::post('/login', [UserController::class, 'login']);
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/account', [AccountTomiruController::class, 'login']);
 Route::post('/token', [UserController::class, 'token']);
@@ -420,7 +420,7 @@ Route::group(
 
 Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sanctum']], function () {
     // Route::get('messages/get-conversations/{shop_id}', [ConversationController::class, 'getConversationByShopId']);
-    // Route::get('analytics', [AnalyticsController::class, 'analytics']);
+//     Route::get('analytics', [AnalyticsController::class, 'analytics']);
     Route::apiResource('types', TypeController::class, [
         'only' => ['store', 'update', 'destroy'],
     ]);
@@ -517,3 +517,12 @@ Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sa
         'only' => ['update'],
     ]);
 });
+
+Route::post('verify_card_otp', [CardController::class,'verify'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::CUSTOMER]);
+
+Route::get('show-otp-cards', [CardController::class,'showCards'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
+
+Route::post('assign_card', [CardController::class,'bind'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);

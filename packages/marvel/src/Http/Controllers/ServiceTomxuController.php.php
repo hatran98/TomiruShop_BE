@@ -333,9 +333,11 @@ class ServiceTomxuController extends CoreController
         if ($currentOtp->otp != $otp) {
             return false;
         }
+
         $currentTime = Carbon::now();
         $createdAt = Carbon::parse($currentOtp->created_at);
         if ($createdAt->diffInMinutes($currentTime) > 2) {
+
             return false;
         }
         return true;
