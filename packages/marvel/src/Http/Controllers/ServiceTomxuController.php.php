@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
 use Marvel\Database\Models\OTP;
 use Marvel\Database\Models\Product;
@@ -20,12 +19,6 @@ use Marvel\Database\Models\Shop;
 use Marvel\Database\Models\Balance;
 use Marvel\Database\Models\UsersTransaction;
 use Marvel\Database\Models\OrderProduct;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Support\Facades\Queue;
-use Illuminate\Bus\Queueable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Bus;
 use App\Listeners\SendOrderConfirmationEmail;
 class ServiceTomxuController extends CoreController
 {
@@ -61,7 +54,7 @@ class ServiceTomxuController extends CoreController
         }
         //check domain
         $domain = $request->getHost();
-        if ($domain !== env('DOMAIN_SHOP')) {
+        if ($domain != env('DOMAIN_SHOP')) {
             return response(['message' => 'Unsupported', 'status' => false], 403);
         }
 
@@ -401,7 +394,7 @@ class ServiceTomxuController extends CoreController
             $correspondingProduct = OrderProduct::where('order_id', $orderId)
                 ->where('product_id', $product['product_id'])
                 ->where('order_quantity', $product['quantity'])
-                ->where('tomxu', $product['tomxu'])
+//                ->where('tomxu', $product['tomxu'])
                 ->where('tomxu_subtotal', $product['tomxu_subtotal'])
                 ->first();
             if (!$correspondingProduct) {
@@ -425,9 +418,9 @@ class ServiceTomxuController extends CoreController
                 'balance' => $newBalanceSend,
                 'updated_at' => now(),
             ]);
-            //'payment_order_tomxu'
+
              UsersTransaction::create([
-                'type' => 29,
+                'type' => 29, //'payment_order_tomxu'
                 'user_id' => $user->id,
                 'token_id' => 1,
                 "order_id" => $order->id,
@@ -452,9 +445,9 @@ class ServiceTomxuController extends CoreController
                 'balance' => $newBalanceReceive,
                 'updated_at' => now(),
             ]);
-            //           'receive_order_payment_tomxu'
+
              UsersTransaction::create([
-                'type' => 30,
+                'type' => 30,//'receive_order_payment_tomxu'
                 'user_id' => $seller['sellerId'],
                 'token_id' => 1,
                 'to_id' => $user->id,
