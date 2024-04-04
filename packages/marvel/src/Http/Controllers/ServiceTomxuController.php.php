@@ -35,7 +35,7 @@ class ServiceTomxuController extends CoreController
 
     public function __construct()
     {
-        $this->clientId = 458875;
+        $this->clientId = env('CLIENT_KEY');
         $this->secretKey = env('CREATE_TOKEN_KEY');
         $this->secretIV = env('CREATE_TOKEN_IV');
     }
@@ -52,17 +52,16 @@ class ServiceTomxuController extends CoreController
         $user_email = $validatedData['user_email'];
         $user_id = $validatedData['user_id'];
         $clientId = $request->header('clientId');
+
         $secret_token = $validatedData['secret_token'];
         //check Auth , check clientKey and secret_token
         $user = $this->checkAuth($user_id, $user_email, $clientId, $secret_token);
         if (!$user) {
             return response(['message' => 'Unauthorized', 'status' => false], 401);
         }
-
         //check domain
-        $domain = $request->header('domain');
-        //$domain = $request->getHost();
-        if ($domain !== 'shop.tomiru.com') {
+        $domain = $request->getHost();
+        if ($domain !== env('DOMAIN_SHOP')) {
             return response(['message' => 'Unsupported', 'status' => false], 403);
         }
 
@@ -127,9 +126,8 @@ class ServiceTomxuController extends CoreController
         $secret_token = $validatedData['secret_token'];
 
         //check domain
-        $domain = $request->header('domain');
-        //         $domain = $request->getHost();
-        if ($domain !== 'shop.tomiru.com') {
+        $domain = $request->getHost();
+        if ($domain !== env('DOMAIN_SHOP')) {
             return response(['message' => 'Unsupported', 'status' => false], 405);
         }
 
@@ -277,11 +275,11 @@ class ServiceTomxuController extends CoreController
             return false;
         }
         //clientId
-        if ($clientId != $this->clientId) {
+        if ($clientId != $this->encrypt($this->clientId)) {
             return false;
         }
-//        check secret
-        $secret = $this->encrypt($clientId . $user->id . $user->email);
+        // check secret
+        $secret = $this->encrypt($this->clientId . $user->id . $user->email);
         if ($secret_token != $secret) {
             return false;
         }
@@ -531,33 +529,3 @@ class ServiceTomxuController extends CoreController
         ];
     }
 }
-
-//class SendOrderConfirmationEmail implements ShouldQueue
-//{
-//    use Queueable, InteractsWithQueue, SerializesModels;
-//
-//    protected $data;
-//    protected $endpoint;
-//
-//    public function __construct($data, $endpoint)
-//    {
-//        $this->data = $data;
-//        $this->endpoint = $endpoint;
-//    }
-//
-//    public static function dispatch($data, $endpoint)
-//    {
-//        return app('Illuminate\Contracts\Bus\Dispatcher')->dispatch(new static(...func_get_args()));
-//    }
-//
-//    public function handle()
-//    {
-//        Http::withHeaders([
-//            'Content-Type' => 'application/json',
-//            'clientId' => 'tomiruHaDong'
-//        ])->post('http://192.168.102.11:8080/' . $this->endpoint, [
-//            'content' => $this->data,
-//        ]);
-//
-//    }
-//}
