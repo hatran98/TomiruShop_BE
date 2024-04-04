@@ -156,6 +156,7 @@ class ServiceTomxuController extends CoreController
             ->where('order_status', 'order-pending')
             ->where('payment_status', 'payment-pending')
             ->first();
+
         if (!$order || $order->customer_id != $from_id || $order->total_tomxu != $validatedData['total_tomxu']) {
             return response(['message' => 'You cannot make this transaction', 'status' => false], 422);
         }
@@ -473,9 +474,13 @@ class ServiceTomxuController extends CoreController
     protected function getBuyerAndSellerDataToSendMail($order, $user, $preBalance, $sellers)
     {
         $ids = UsersTransaction::where('order_id', $order->id)->where('type', 'payment_order_tomxu')->pluck('id')->toArray();
-
+        $products_name = [];
+            foreach ($order->products as $product_name) {
+                $products_name[] = $product_name['name'];
+            }
         //data of buyer to send mail
         $buyer = [
+            'product_name' => $products_name,
             'buyer_id' => $user->id,
             'buyer_email' => $user->email,
             'title' => 'Payment Success',
@@ -492,8 +497,16 @@ class ServiceTomxuController extends CoreController
         $infSellers = [];
 
         foreach ($sellers as $seller) {
+            $shop_ids= Shop::where('owner_id', $seller['sellerId'])->pluck('id')->toArray();
+            $product_name = [];
+            foreach ($order->products as $product) {
+                if (in_array($product['shop_id'], $shop_ids)) {
+                    $product_name[]= $product['name'];
+                }
+            }
             $id = UsersTransaction::where('order_id', $order->id)->where('type', 'receive_order_payment_tomxu')->pluck('id')->first();
             $infSeller = [
+                'product_name' => $product_name ,
                 'seller_id' => $seller['sellerId'],
                 'seller_email' => $seller['email'],
                 'title' => 'Payment received',
