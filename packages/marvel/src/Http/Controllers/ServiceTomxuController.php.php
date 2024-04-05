@@ -112,10 +112,10 @@ class ServiceTomxuController extends CoreController
         $secret_token = $validatedData['secret_token'];
 
 //        //validate domain
-//        $domain = $request->getHost();
-//        if ($domain !== env('DOMAIN_SHOP')) {
-//            return response(['message' => 'Unsupported', 'status' => false], 405);
-//        }
+        $domain = $request->getHost();
+        if ($domain !== env('DOMAIN_SHOP')) {
+            return response(['message' => 'Unsupported', 'status' => false], 405);
+        }
 
         //validate Auth, validate clientKey and secret_token
         $user = $this->validateAuth($from_id, $from_user_email, $clientId, $secret_token);
