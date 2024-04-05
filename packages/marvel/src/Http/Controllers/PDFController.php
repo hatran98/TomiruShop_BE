@@ -2,10 +2,7 @@
 
 namespace Marvel\Http\Controllers;
 
-use Dompdf\Options;
 use Illuminate\Http\Request;
-use Dompdf\Dompdf;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Marvel\Database\Models\User;
 use Marvel\Database\Models\UserCardOtpToken;
@@ -13,8 +10,6 @@ use Marvel\Database\Models\UserOtpCard;
 use Marvel\Database\Repositories\PdfRepository;
 use Marvel\Database\Repositories\UserCardOtpTokenRepository;
 use Marvel\Database\Repositories\UserOtpCardRepository;
-use App\Helpers\EncryptionHelper;
-use Illuminate\Support\Facades\Http;
 
 class PDFController extends CoreController
 {
@@ -24,8 +19,12 @@ class PDFController extends CoreController
 
     public PdfRepository $pdfRepository;
 
-    public function __construct(UserCardOtpTokenRepository $tokenRepository, UserOtpCardRepository $cardRepository , PdfRepository $pdfRepository)
-    {
+
+    public function __construct(
+        UserCardOtpTokenRepository $tokenRepository,
+        UserOtpCardRepository $cardRepository,
+        PdfRepository $pdfRepository,
+    ) {
         $this->tokenRepository = $tokenRepository;
         $this->cardRepository = $cardRepository;
         $this->pdfRepository = $pdfRepository;
@@ -36,14 +35,19 @@ class PDFController extends CoreController
     {
         // Kích hoạt thẻ và lấy số serial
         $response = $this->activateCardAndGetSerial($request);
-        $card_serial = $this -> pdfRepository -> ExtractCardSerialFromResponse($response);
-        $password = $request->input('password');
         if ($response->getStatusCode() !== 200) {
             return $response;
         }
+        $card_serial = $this->pdfRepository->extractCardSerialFromResponse($response); // Sửa tên phương thức
+        $password = $request->input('password');
 
         // Gọi phương thức mới từ repository để tạo PDF và gửi email
-        return $this->pdfRepository->generatePdfAndSendEmail($card_serial, $password);
+        $sendEmail = $this->pdfRepository->generatePdfAndSendEmail($card_serial, $password);
+//        if ($sendEmail->getStatusCode() !== 200) {
+//            return $sendEmail;
+//        }
+        return $sendEmail;
+
     }
 
 

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "608e4197345b55af14bfa1d0147e0d5c",
+    "content-hash": "96f0916f3ceed2d374e3710e6c6b0f96",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -62,16 +62,16 @@
         },
         {
             "name": "aws/aws-sdk-php",
-            "version": "3.301.9",
+            "version": "3.303.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/aws/aws-sdk-php.git",
-                "reference": "23eda9eeb6c44a3ed6a12951b61020dc6048f7f5"
+                "reference": "3389ceccdc8e78d38bf60c6648d7da9768a86d9b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/23eda9eeb6c44a3ed6a12951b61020dc6048f7f5",
-                "reference": "23eda9eeb6c44a3ed6a12951b61020dc6048f7f5",
+                "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/3389ceccdc8e78d38bf60c6648d7da9768a86d9b",
+                "reference": "3389ceccdc8e78d38bf60c6648d7da9768a86d9b",
                 "shasum": ""
             },
             "require": {
@@ -151,9 +151,9 @@
             "support": {
                 "forum": "https://forums.aws.amazon.com/forum.jspa?forumID=80",
                 "issues": "https://github.com/aws/aws-sdk-php/issues",
-                "source": "https://github.com/aws/aws-sdk-php/tree/3.301.9"
+                "source": "https://github.com/aws/aws-sdk-php/tree/3.303.3"
             },
-            "time": "2024-03-27T18:26:04+00:00"
+            "time": "2024-04-04T18:11:56+00:00"
         },
         {
             "name": "barryvdh/laravel-dompdf",
@@ -4706,7 +4706,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/marvel",
-                "reference": "15152c061b311bd16fbb42c854db54b6666f59b8"
+                "reference": "a38dfbbe2600f8440a1b0149a90181f20b4b2772"
             },
             "require": {
                 "bensampo/laravel-enum": "6.6.4",
@@ -4714,6 +4714,7 @@
                 "cviebrock/eloquent-sluggable": "10.0.0",
                 "dgvai/laravel-sslcommerz": "^1.0",
                 "drewm/mailchimp-api": "^2.5",
+                "ext-curl": "*",
                 "ext-openssl": "*",
                 "illuminate/support": "~9|~10",
                 "iyzico/iyzipay-php": "^2.0",
@@ -14519,7 +14520,9 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.0|^8.1"
+        "php": "^8.0|^8.1",
+        "ext-curl": "*",
+        "ext-openssl": "*"
     },
     "platform-dev": [],
     "plugin-api-version": "2.6.0"
