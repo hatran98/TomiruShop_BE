@@ -20,6 +20,7 @@ use Marvel\Database\Models\Balance;
 use Marvel\Database\Models\UsersTransaction;
 use Marvel\Database\Models\OrderProduct;
 use App\Listeners\SendOrderConfirmationEmail;
+use App\Helpers\EncryptionHelper;
 class ServiceTomxuController extends CoreController
 {
     private int $clientId;
@@ -48,7 +49,7 @@ class ServiceTomxuController extends CoreController
 
         $secret_token = $validatedData['secret_token'];
         //check Auth , check clientKey and secret_token
-        $user = $this->checkAuth($user_id, $user_email, $clientId, $secret_token);
+        $user = $this->validateAuth($user_id, $user_email, $clientId, $secret_token);
         if (!$user) {
             return response(['message' => 'Unauthorized', 'status' => false], 401);
         }
@@ -58,18 +59,10 @@ class ServiceTomxuController extends CoreController
             return response(['message' => 'Unsupported', 'status' => false], 403);
         }
 
-        //check balance is_locked?
-        $isBalanceOfBuyer = $this->checkBalanceOfBuyer($user_id, $validatedData['type_otp']);
-        if (isset($isBalanceOfBuyer['message'])) {
-            return response(['message' => $isBalanceOfBuyer['message'], 'status' => false], 422);
-        }
-
-        //check balance has more than total tomxu of order
-        $userBalance = UsersBalance::where('user_id', $user_id)
-            ->where('token_id', 1)
-            ->first();
-        if ($userBalance->balance < $validatedData['total_tomxu']) {
-            return response(['message' => 'Insufficient balance to complete the transaction', 'status' => false], 422);
+        // Check if the balance is locked.
+        $isBalanceForBuyer  = $this->checkBalanceForBuyer($user_id, $validatedData['type_otp'],$validatedData['total_tomxu']);
+        if (isset($isBalanceLockedForBuyer ['message'])) {
+            return response(['message' => $isBalanceForBuyer ['message'], 'status' => false], 422);
         }
 
         //Generate OTP
@@ -118,14 +111,14 @@ class ServiceTomxuController extends CoreController
         $clientId = $request->header('clientId');
         $secret_token = $validatedData['secret_token'];
 
-        //check domain
-        $domain = $request->getHost();
-        if ($domain !== env('DOMAIN_SHOP')) {
-            return response(['message' => 'Unsupported', 'status' => false], 405);
-        }
+//        //validate domain
+//        $domain = $request->getHost();
+//        if ($domain !== env('DOMAIN_SHOP')) {
+//            return response(['message' => 'Unsupported', 'status' => false], 405);
+//        }
 
-        //check Auth, check clientKey and secret_token
-        $user = $this->checkAuth($from_id, $from_user_email, $clientId, $secret_token);
+        //validate Auth, validate clientKey and secret_token
+        $user = $this->validateAuth($from_id, $from_user_email, $clientId, $secret_token);
         if (!$user) {
             return response(['message' => 'Unauthorized', 'status' => false], 401);
         }
@@ -135,12 +128,12 @@ class ServiceTomxuController extends CoreController
         if (!$isOtp) {
             return response(['message' => 'OTP incorrect', 'status' => false], 422);
         }
-
-        //check balance is locked ?
-        $isBalanceOfBuyer = $this->checkBalanceOfBuyer($from_id, $validatedData['type_otp'], $validatedData['tracking_number']);
-        if (isset($isBalanceOfBuyer['message'])) {
-            return response(['message' => $isBalanceOfBuyer['message'], 'status' => false], 422);
+        // Check if the balance for buyer.
+        $balanceForBuyer  = $this->checkBalanceForBuyer($from_id, $validatedData['type_otp'],  $validatedData['total_tomxu']);
+        if (isset($isBalanceLockedForBuyer ['message'])) {
+            return response(['message' => $balanceForBuyer ['message'], 'status' => false], 422);
         }
+        $preBalance = $balanceForBuyer['balance'];
 
         //check order of user requests
         $order = Order::where('tracking_number', $validatedData['tracking_number'])
@@ -151,24 +144,20 @@ class ServiceTomxuController extends CoreController
         if (!$order || $order->customer_id != $from_id || $order->total_tomxu != $validatedData['total_tomxu']) {
             return response(['message' => 'You cannot make this transaction', 'status' => false], 422);
         }
-        $userBalance = UsersBalance::where('user_id', $from_id)->where('token_id', 1)->first();
-        $preBalance = $userBalance->balance;
-        if ($preBalance < $validatedData['total_tomxu']) {
-            return response(['message' => 'Insufficient balance to complete the transaction', 'status' => false], 422);
-        }
 
-        //check Seller  and get total tomxu receipt
+        // Check sellers and calculate total tomxu receipt.
         $products = $validatedData['products'];
-        $sellers = $this->checkSellerAndGetTomxuForSeller($products, $user);
+        $sellers = $this->checkSellersAndCalculateTotalTomxuReceipt($products, $user);
         if (isset($sellers['message'])) {
             return response(['message' => $sellers['message'], 'status' => false], 422);
         }
 
         //check if order_product request matches order_product in DB
-        $isCheckInfOrderProducts = $this->checkInfOrderProducts($products, $order);
-        if (isset($isCheckInfOrderProducts['message'])) {
-            return response(['message' => $isCheckInfOrderProducts['message'], 'status' => false], 422);
+        $isOrderProducts = $this->validateOrderProducts($products, $order);
+        if (isset($isOrderProducts['message'])) {
+            return response(['message' => $isOrderProducts['message'], 'status' => false], 422);
         }
+
         //create transaction
         try {
             DB::transaction(function () use ($order, $user, $sellers, $products) {
@@ -180,7 +169,7 @@ class ServiceTomxuController extends CoreController
                 ]);
 
                 //create transaction for seller and buyer
-                $this->updateBalanceAndCreateTransaction($user, $sellers, $order);
+                $this->processOrderPayments($user, $sellers, $order);
 
                 //update quantity,sold_quantity for product
                 foreach ($products as $product) {
@@ -237,7 +226,7 @@ class ServiceTomxuController extends CoreController
         $secret_token = $validatedData['secret_token'];
         $clientId = $request->header('clientId');
 
-        $user = $this->checkAuth($validatedData['customer_id'], $validatedData['email'], $clientId, $secret_token);
+        $user = $this->validateAuth($validatedData['customer_id'], $validatedData['email'], $clientId, $secret_token);
         if (!$user) {
             return response(['message' => 'Unauthorized', 'success' => false], 403);
         }
@@ -254,7 +243,7 @@ class ServiceTomxuController extends CoreController
         ], 200);
     }
 
-    public function checkAuth($user_id, $user_email, $clientId, $secret_token): bool|object
+    public function validateAuth($user_id, $user_email, $clientId, $secret_token): bool|object
     {
         $user = Auth::user();
         if (!$user || $user->id != $user_id) {
@@ -263,15 +252,12 @@ class ServiceTomxuController extends CoreController
         if ($user['is_active'] != 1) {
             return false;
         };
-        //check email
         if ($user->email != $user_email) {
             return false;
         }
-        //clientId
         if ($clientId != $this->encrypt($this->clientId)) {
             return false;
         }
-        // check secret
         $secret = $this->encrypt($this->clientId . $user->id . $user->email);
         if ($secret_token != $secret) {
             return false;
@@ -279,7 +265,7 @@ class ServiceTomxuController extends CoreController
         return $user;
     }
 
-    public function checkBalanceOfBuyer($user_id, $type): array|bool
+    public function checkBalanceForBuyer($user_id, $type,$total_tomxu)
     {
         $userBalance = UsersBalance::where('user_id', $user_id)
             ->where('token_id', 1)
@@ -288,10 +274,18 @@ class ServiceTomxuController extends CoreController
         if (!$userBalance || $userBalance->is_locked == 1) {
             return ['message' => 'Your balance not exist or is locked'];
         }
+         //check balance has more than total tomxu of order
+        $userBalance = UsersBalance::where('user_id', $user_id)
+            ->where('token_id', 1)
+            ->first();
+        if ($userBalance->balance < $total_tomxu) {
+            return ['message' => 'Insufficient balance to complete the transaction'];
+        }
+
         if ($type != 'verify_order') {
             return ['message' => 'Type otp not match'];
         }
-        return true;
+        return $userBalance;
     }
 
     public function createOtp($userId, $type)
@@ -307,10 +301,10 @@ class ServiceTomxuController extends CoreController
         return $otp->otp;
     }
 
-    public function decrypt($encrypt): string
+    public function decrypt($encrypted): string
     {
 
-        return openssl_decrypt($encrypt, 'aes-256-cbc', $this->secretKey, 0, $this->secretIV);
+        return openssl_decrypt($encrypted, 'aes-256-cbc', $this->secretKey, 0, $this->secretIV);
     }
 
     public function encrypt($data): string
@@ -334,7 +328,7 @@ class ServiceTomxuController extends CoreController
         return true;
     }
 
-    public function checkSellerAndGetTomxuForSeller($products, $user): array|object
+    public function checkSellersAndCalculateTotalTomxuReceipt($products, $user): array|object
     {
         $sellers = [];
         foreach ($products as $product) {
@@ -376,7 +370,7 @@ class ServiceTomxuController extends CoreController
         return array_values($sellers);
     }
 
-    public function checkInfOrderProducts($products, $order): bool|array
+    public function validateOrderProducts($products, $order): bool|array
     {
         $orderId = $order->id;
         //check count
@@ -394,7 +388,7 @@ class ServiceTomxuController extends CoreController
             $correspondingProduct = OrderProduct::where('order_id', $orderId)
                 ->where('product_id', $product['product_id'])
                 ->where('order_quantity', $product['quantity'])
-//                ->where('tomxu', $product['tomxu'])
+                //->where('tomxu', $product['tomxu'])
                 ->where('tomxu_subtotal', $product['tomxu_subtotal'])
                 ->first();
             if (!$correspondingProduct) {
@@ -404,76 +398,84 @@ class ServiceTomxuController extends CoreController
         return true;
     }
 
-    public function updateBalanceAndCreateTransaction($user, $sellers, $order): void
+    public function processOrderPayments($buyer, $sellers, $order): void
     {
         foreach ($sellers as $seller) {
-            // update for buyer
-            $userBalanceSend = UsersBalance::where('user_id', $user->id)
+
+            // Update buyer's balance
+            $buyerBalance = UsersBalance::where('user_id', $buyer->id)
                 ->where('token_id', 1)
                 ->lockForUpdate()
                 ->first();
-            $currentBalanceSend = floatval($userBalanceSend->balance);
-            $newBalanceSend = $currentBalanceSend - floatval($seller['tomxuAdd']);
-            $userBalanceSend->update([
-                'balance' => $newBalanceSend,
+            $currentBuyerBalance = floatval($buyerBalance->balance);
+            $newBuyerBalance = $currentBuyerBalance - floatval($seller['tomxuAdd']);
+            $buyerBalance->update([
+                'balance' => $newBuyerBalance,
                 'updated_at' => now(),
             ]);
 
-             UsersTransaction::create([
+            // Create transaction for buyer
+            UsersTransaction::create([
                 'type' => 29, //'payment_order_tomxu'
-                'user_id' => $user->id,
+                'user_id' => $buyer->id,
                 'token_id' => 1,
                 "order_id" => $order->id,
-                'from_id' => $user->id,
+                'from_id' => $buyer->id,
                 'to_id' => $seller['sellerId'],
                 'status' => 'success',
                 'value' => floatval($seller['tomxuAdd']),
-                'pre_balance' => $currentBalanceSend,
-                'post_balance' => $newBalanceSend,
+                'pre_balance' => $currentBuyerBalance,
+                'post_balance' => $newBuyerBalance,
                 'updated_at' => now(),
                 'created_at' => now(),
             ]);
 
-            // update for seller
-            $userBalanceReceive = UsersBalance::where('user_id', $seller['sellerId'])
+            // Update seller's balance
+            $sellerBalance = UsersBalance::where('user_id', $seller['sellerId'])
                 ->where('token_id', 1)
                 ->lockForUpdate()
                 ->first();
-            $currentBalanceReceive = floatval($userBalanceReceive->balance);
-            $newBalanceReceive = $currentBalanceReceive + floatval($seller['tomxuAdd']);
-            $userBalanceReceive->update([
-                'balance' => $newBalanceReceive,
+            $currentSellerBalance = floatval($sellerBalance->balance);
+            $newSellerBalance = $currentSellerBalance + floatval($seller['tomxuAdd']);
+            $sellerBalance->update([
+                'balance' => $newSellerBalance,
                 'updated_at' => now(),
             ]);
 
-             UsersTransaction::create([
+            // Create transaction for seller
+            UsersTransaction::create([
                 'type' => 30,//'receive_order_payment_tomxu'
                 'user_id' => $seller['sellerId'],
                 'token_id' => 1,
-                'to_id' => $user->id,
+                'to_id' => $buyer->id,
                 "order_id" => $order->id,
                 'from_id' => $seller['sellerId'],
                 'status' => 'success',
                 'value' => floatval($seller['tomxuAdd']),
-                'pre_balance' => $currentBalanceReceive,
-                'post_balance' => $newBalanceReceive,
+                'pre_balance' => $currentSellerBalance,
+                'post_balance' => $newSellerBalance,
                 'updated_at' => now(),
                 'created_at' => now(),
             ]);
-
         }
     }
 
     protected function getBuyerAndSellerDataToSendMail($order, $user, $preBalance, $sellers)
     {
-        $ids = UsersTransaction::where('order_id', $order->id)->where('type', 'payment_order_tomxu')->pluck('id')->toArray();
-        $products_name = [];
-            foreach ($order->products as $product_name) {
-                $products_name[] = $product_name['name'];
-            }
-        //data of buyer to send mail
+        // Get IDs of transactions related to the order
+        $transactionIds = UsersTransaction::where('order_id', $order->id)
+                                           ->where('type', 'payment_order_tomxu')
+                                           ->pluck('id')
+                                           ->toArray();
+
+        // Extract product names from the order
+        $productNames = [];
+        foreach ($order->products as $product) {
+            $productNames[] = $product['name'];
+        }
+        // Data for the buyer
         $buyer = [
-            'product_name' => $products_name,
+            'product_name' => $productNames,
             'buyer_id' => $user->id,
             'buyer_email' => $user->email,
             'title' => 'Payment Success',
@@ -482,7 +484,7 @@ class ServiceTomxuController extends CoreController
             'date' => $order->created_at,
             'pre_balance' => $preBalance,
             'post_balance' => $preBalance - floatval($order->total_tomxu),
-            'id_transactions' => $ids,
+            'id_transactions' => $transactionIds,
             'status_payment' => 'payment_success'
         ];
 
