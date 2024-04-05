@@ -12,14 +12,15 @@ use Illuminate\Support\Facades\Response;
 use Marvel\Database\Models\OTP;
 use Marvel\Database\Models\Product;
 use Marvel\Database\Models\User;
+use Marvel\Database\Models\Shop;
+use Marvel\Database\Models\OrderProduct;
+use App\Listeners\SendOrderConfirmationEmail;
 use Marvel\Database\Models\Tomxu;
 use Marvel\Database\Models\UsersBalance;
 use Marvel\Database\Models\Order;
-use Marvel\Database\Models\Shop;
 use Marvel\Database\Models\Balance;
 use Marvel\Database\Models\UsersTransaction;
-use Marvel\Database\Models\OrderProduct;
-use App\Listeners\SendOrderConfirmationEmail;
+use Marvel\Database\Models\ShopTransaction;
 class ServiceTomxuController extends CoreController
 {
     private int $clientId;

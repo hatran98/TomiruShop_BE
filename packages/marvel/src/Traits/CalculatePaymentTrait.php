@@ -45,14 +45,6 @@ trait CalculatePaymentTrait
 
                 $product = Product::findOrFail($item['product_id']);
                 $subtotal += $this->calculateEachItemTomxuTotal($product, $item['order_quantity']);
-
-//                if (isset($item['variation_option_id'])) {
-//                    $variation = Variation::findOrFail($item['variation_option_id']);
-//                    $subtotal += $this->calculateEachItemTomxuTotal($variation, $item['order_quantity']);
-//                } else {
-//                    $product = Product::findOrFail($item['product_id']);
-//                    $subtotal += $this->calculateEachItemTomxuTotal($product, $item['order_quantity']);
-//                }
             }
             return $subtotal;
         } catch (\Throwable $th) {

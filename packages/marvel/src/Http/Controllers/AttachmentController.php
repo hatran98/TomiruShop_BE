@@ -6,6 +6,8 @@ namespace Marvel\Http\Controllers;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Facades\Image;
 use Marvel\Database\Models\Attachment;
 use Marvel\Database\Repositories\AttachmentRepository;
 use Marvel\Exceptions\MarvelException;
@@ -44,26 +46,34 @@ class AttachmentController extends CoreController
     {
         $urls = [];
         foreach ($request->attachment as $media) {
+            // Tạo một attachment mới
             $attachment = new Attachment;
             $attachment->save();
-            $attachment->addMedia($media)->toMediaCollection();
-            foreach ($attachment->getMedia() as $media) {
-                if (strpos($media->mime_type, 'image/') !== false) {
-                    $converted_url = [
-                        'thumbnail' => $media->getUrl('thumbnail'),
-                        'original' => $media->getUrl(),
-                        'id' => $attachment->id
-                    ];
-                } else {
-                    $converted_url = [
-                        'thumbnail' => '',
-                        'original' => $media->getUrl(),
-                        'id' => $attachment->id
-                    ];
-                }
-            }
+
+            // Lưu tệp gốc lên S3 và lấy URL
+            $originalFileName = 'media/' . time() . '.' . $media->getClientOriginalExtension();
+            Storage::disk('vultrobjects')->put($originalFileName, file_get_contents($media), 'public');
+            $originalUrl = Storage::disk('vultrobjects')->url($originalFileName);
+
+            // Tạo thumbnail từ hình ảnh gốc
+            $thumbnail = Image::make($media)->fit(100, 100)->encode();
+
+            // Lưu thumbnail lên S3 và lấy URL
+            $thumbnailFileName = 'media/thumbnails/' . time() . '.' . $media->getClientOriginalExtension();
+            Storage::disk('vultrobjects')->put($thumbnailFileName, $thumbnail->__toString(), 'public');
+            $thumbnailUrl = Storage::disk('vultrobjects')->url($thumbnailFileName);
+
+            // Tạo mảng chứa URL và ID của tệp
+            $converted_url = [
+                'original' => $originalUrl,
+                'thumbnail' => $thumbnailUrl,
+                'id' => $attachment->id
+            ];
+
+            // Thêm vào mảng URLs
             $urls[] = $converted_url;
         }
+
         return $urls;
     }
 
