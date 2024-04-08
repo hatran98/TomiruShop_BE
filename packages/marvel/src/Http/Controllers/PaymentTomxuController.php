@@ -24,7 +24,7 @@ class PaymentTomxuController extends CoreController
             'otp' => 'required',
         ]);
 
-        $abc =
+//        $abc =
         //check user
         $users = Auth::user();
         if(!$users || $users->id != $validatedData['user_id']){

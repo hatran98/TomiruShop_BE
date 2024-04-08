@@ -31,7 +31,8 @@ class SendOrderConfirmationEmail implements ShouldQueue
     {
         Http::withHeaders([
             'Content-Type' => 'application/json',
-            'clientId' => 'tomiruHaDong'
+            'secret' => 'tomiruHaDong',
+            'client_id'  =>'hieu-dev.com'
         ])->post('http://192.168.102.11:8080/' . $this->endpoint, [
             'content' => $this->data,
         ]);

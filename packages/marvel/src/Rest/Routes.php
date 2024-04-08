@@ -25,6 +25,7 @@ use Marvel\Http\Controllers\FlashSaleVendorRequestController;
 use Marvel\Http\Controllers\ManufacturerController;
 use Marvel\Http\Controllers\MessageController;
 use Marvel\Http\Controllers\OrderController;
+use Marvel\Http\Controllers\OTPController;
 use Marvel\Http\Controllers\PaymentIntentController;
 use Marvel\Http\Controllers\PaymentMethodController;
 use Marvel\Http\Controllers\PaymentTomxuController;
@@ -216,9 +217,10 @@ Route::group(['middleware' => ['can:' . Permission::CUSTOMER, 'auth:sanctum', 'e
     Route::post('transaction-tomxu', [PaymentTomxuController::class, 'transaction']);
 
     Route::post('request-otp', [ServiceTomxuController::class, 'requestOtp']);
-    Route::post('payment/tomxu', [ServiceTomxuController::class, 'confirmTransactionWithOTP']);
+    Route::post('payment/tomxu', [ServiceTomxuController::class, 'confirmOrderPaymentWithOTP']);
 
     Route::post('balance-tomxu', [ServiceTomxuController::class, 'getBalanceTomxu']);
+    Route::post('api/request-otp', [OTPController::class, 'requestOtp']);
 
     Route::post('/update-email', [UserController::class, 'updateUserEmail']);
     Route::get('me', [UserController::class, 'me']);
