@@ -53,6 +53,15 @@ return [
             'visibility' => 'public',
         ],
 
+        'vultrobjects' => [
+            'driver' => 's3',
+            'key' => env('VULTROBJECTS_ACCESS_KEY_ID'),
+            'secret' => env('VULTROBJECTS_SECRET_ACCESS_KEY'),
+            'region' => env('VULTROBJECTS_REGION'),
+            'bucket' => env('VULTROBJECTS_BUCKET'),
+            'endpoint' => env('VULTROBJECTS_ENDPOINT'),
+        ],
+
     ],
 
     /*

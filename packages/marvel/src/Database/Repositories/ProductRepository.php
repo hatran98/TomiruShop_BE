@@ -7,6 +7,7 @@ use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Marvel\Database\Models\Availability;
@@ -201,6 +202,7 @@ class ProductRepository extends BaseRepository
      */
     public function storeProduct($request, $setting)
     {
+
         try {
             $data = $request->only($this->dataArray);
 
@@ -222,9 +224,8 @@ class ProductRepository extends BaseRepository
             }
             $tomxu = $data['tomxu'];
             $product = $this->create($data);
-            $productTomxu = Tomxu::create([
-                'product_id' => $product->id,
-                'price_tomxu' =>$tomxu
+            $productTomxu = $product->tomxu()->create([
+                'price_tomxu' => $tomxu
             ]);
 
 

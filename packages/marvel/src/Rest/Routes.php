@@ -64,14 +64,12 @@ use Marvel\Http\Controllers\ServiceTomxuController;
  */
 
 Broadcast::routes(['middleware' => ['auth:sanctum']]);
-Route::post('/generate-pdf',[PDFController::class, 'generatePdf']);
+Route::post('/generate-pdf', [PDFController::class, 'generatePdf']);
 Route::get('/email/verify/{id}/{hash}', [UserController::class, 'verifyEmail'])->name('verification.verify');
-Route::post('/account' , [AccountTomiruController::class, 'login']);
 Route::post('/login', [UserController::class, 'login']);
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/account', [AccountTomiruController::class, 'login']);
 Route::post('/token', [UserController::class, 'token']);
-
 Route::post('/logout', [UserController::class, 'logout']);
 Route::post('/forget-password', [UserController::class, 'forgetPassword']);
 Route::post('/verify-forget-password-token', [UserController::class, 'verifyForgetPasswordToken']);
@@ -422,7 +420,7 @@ Route::group(
 
 Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sanctum']], function () {
     // Route::get('messages/get-conversations/{shop_id}', [ConversationController::class, 'getConversationByShopId']);
-//     Route::get('analytics', [AnalyticsController::class, 'analytics']);
+    //     Route::get('analytics', [AnalyticsController::class, 'analytics']);
     Route::apiResource('types', TypeController::class, [
         'only' => ['store', 'update', 'destroy'],
     ]);
@@ -520,26 +518,26 @@ Route::group(['middleware' => ['permission:' . Permission::SUPER_ADMIN, 'auth:sa
     ]);
 });
 
-Route::post('verify_card_otp', [CardController::class,'verify'])
+Route::post('verify_card_otp', [CardController::class, 'verify'])
     ->middleware(['auth:sanctum', 'can:' . Permission::CUSTOMER]);
 
 Route::middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN])->group(function () {
     Route::get('show-cards', [CardController::class, 'showExistingCards']);
-    Route::get('show-otp-cards',[CardController::class,'showCards']);
+    Route::get('show-otp-cards', [CardController::class, 'showCards']);
     Route::get('show-card-detail', [CardController::class, 'showCardDetail']);
     // Thêm các route khác tương tự nếu cần
 });
 
-Route::post('assign_card', [CardController::class,'bind'])
+Route::post('assign_card', [CardController::class, 'bind'])
     ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
 
-Route::post('online-card',[PDFController::class,'createCard'])
+Route::post('online-card', [PDFController::class, 'createCard'])
     ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
 
 Route::post("hard-card", [CardController::class, 'printCard'])
     ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
 
-Route::post('create-card', [CardController::class,'createCard'])
+Route::post('create-card', [CardController::class, 'createCard'])
     ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
 
-Route::post('update-card', [CardController::class,'updateCard']);
+Route::post('update-card', [CardController::class, 'updateCard']);

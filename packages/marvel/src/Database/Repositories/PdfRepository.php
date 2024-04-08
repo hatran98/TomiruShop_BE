@@ -3,6 +3,7 @@
 namespace Marvel\Database\Repositories;
 
 use App\Helpers\EncryptionHelper;
+use Illuminate\Support\Facades\Storage;
 use Marvel\Database\Models\User;
 use Marvel\Database\Models\UserOtpCard;
 use Marvel\Database\Models\UserCardOtpToken;
@@ -15,16 +16,12 @@ class PdfRepository
 
     public function generatePdfAndSendEmail($card_serial, $password)
     {
-
         // Lấy dữ liệu OTP
         $otpData = $this->getOtpData($card_serial);
 
         if (!$otpData) {
             return response()->json(['message' => 'OTP data not found'], 404);
         }
-
-        // Tạo thư mục lưu trữ PDF nếu cần
-        $this->createPdfDirectoryIfNeeded();
 
         // Tạo và lưu PDF
         $pdf = $this->createPdfWithPassword($card_serial, $otpData, $password);
@@ -33,18 +30,23 @@ class PdfRepository
             return response()->json(['message' => 'PDF creation failed'], 500);
         }
 
+
         $email = $this->getUserEmail($card_serial);
+
         // Gửi email với PDF đính kèm
         if ($email) {
-            $this->sendEmailWithPdf($email, $pdf, $card_serial);
-            return response()->json(['message' => 'Email sent successfully', 'pdf_path' => $pdf]);
+            $sendMail = $this->sendEmailWithPdf($email, $pdf, $card_serial);
+            if ($sendMail !== true) {
+                // Nếu gửi email thất bại, chỉ trả về thông báo thành công
+                return response()->json(['message' => 'Email not sent, but card activated successfully'], 200);
+            }
+            return response()->json(['message' => 'Email sent successfully'], 200);
         }
 
         // Trả về đường dẫn PDF
-        return response()->json(['message' => 'Successfully', 'pdf_path' => $pdf]);
-
-
+        return response()->json(['message' => 'PDF created successfully'], 200);
     }
+
 
 
     public function getUserEmail($card_serial)
@@ -80,15 +82,8 @@ class PdfRepository
         return json_decode($response->getContent(), true)['card_serial'];
     }
 
-    public function createPdfDirectoryIfNeeded()
-    {
-        $pdfDirectory = storage_path('app/pdf');
-        if (!file_exists($pdfDirectory)) {
-            mkdir($pdfDirectory, 0777, true);
-        }
-    }
 
-    public function createPdfWithPassword($card_serial,$otpData, $password)
+    public function createPdfWithPassword($card_serial, $otpData, $password)
     {
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
@@ -103,13 +98,19 @@ class PdfRepository
 
         $dompdf->getCanvas()->get_cpdf()->setEncryption($password, $password);
 
-        $pdfWithPasswordPath = storage_path('app/pdf/' . $card_serial . '.pdf');
-        file_put_contents($pdfWithPasswordPath, $dompdf->output());
+        $pdfFileName = $card_serial . '.pdf';
 
-        return $pdfWithPasswordPath;
+        // Tạo tệp PDF trực tiếp từ nội dung và lưu trực tiếp lên S3
+        Storage::disk('vultrobjects')->put('pdf/' . $pdfFileName, $dompdf->output(), 'public');
+
+
+        // Trả về URL của tệp PDF trên S3
+        return Storage::disk('vultrobjects')->url('pdf/' . $pdfFileName);
+
     }
 
-    public function sendEmailWithPdf($email,$pdf, $card_serial)
+
+    public function sendEmailWithPdf($email, $pdf, $card_serial)
     {
         $key = env('CREATE_TOKEN_KEY');
         $iv = env('CREATE_TOKEN_IV');
@@ -120,24 +121,33 @@ class PdfRepository
                 'email' => $email,
                 'subject' => 'Kích hoạt thẻ thành công',
                 'htmlBody' => 'Mã số thẻ : ' . $card_serial . ' đã được kích hoạt thành công </br> Vui lòng xem mã OTP của thẻ trong file pdf đính kém',
-                'attachment' => base64_encode(file_get_contents($pdf)),
+                'attachment' => base64_encode($pdf),
                 'type' => 'pdf',
                 'template' => 'pdf'
             ];
 
             $encryptToken = EncryptionHelper::encrypt($content, $key, $iv);
-            $clientId = 'tomiruHaDong';
+            $clientId = 'ha-dev.com';
 
-            Http::withHeaders([
+            $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
                 'clientId' => $clientId,
-            ])->post('http://192.168.102.11:8080/api/sendmail/pdf', [
+                'clientSecret' => 'tomiruHaDong'
+            ])->post(env('API_SENDMAIL'), [
                 'content' => $encryptToken,
             ]);
 
-            return true;
+            if ($response->successful()) {
+                return true;
+            } else {
+                // Nếu gửi email thất bại, trả về thông báo thất bại
+                return false;
+            }
         } else {
             return false;
         }
     }
+
+
+
 }
