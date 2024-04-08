@@ -117,7 +117,7 @@ class OrderRepository extends BaseRepository
     public function storeOrder($request, $settings): mixed
     {
         $request['tracking_number'] = $this->generateTrackingNumber();
-        $settings = Settings::getData($request?->language);
+        $settings = Settings::getData($request->language);
         $fullWalletOrCODPayment = $request->isFullWalletPayment ? PaymentGatewayType::FULL_WALLET_PAYMENT : $settings['defaultPaymentGateway'];
         $payment_gateway_type = !empty($request->payment_gateway) ? $request->payment_gateway : $fullWalletOrCODPayment;
 
