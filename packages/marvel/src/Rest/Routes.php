@@ -541,3 +541,8 @@ Route::post('create-card', [CardController::class, 'createCard'])
     ->middleware(['auth:sanctum', 'can:' . Permission::SUPER_ADMIN]);
 
 Route::post('update-card', [CardController::class, 'updateCard']);
+
+Route::get('show-products', [ProductController::class, 'showFetchProduct'])
+    ->middleware(['auth:sanctum', 'can:' . Permission::STORE_OWNER]);
+
+Route::post('check-token', [AccountTomiruController::class, 'checkToken']);

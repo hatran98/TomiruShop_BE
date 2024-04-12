@@ -64,6 +64,12 @@ class ProductController extends CoreController
         return formatAPIResourcePaginate($data);
     }
 
+    public function showFetchProduct(Request $request) {
+        $limit = $request->limit ? $request->limit : 15;
+        $products = $this->fetchProductShop($request)->paginate($limit)->withQueryString();
+        $data = ProductResource::collection($products)->response()->getData(true);
+        return formatAPIResourcePaginate($data);
+    }
 
 
 
@@ -100,6 +106,35 @@ class ProductController extends CoreController
         return $products_query;
     }
 
+    public function fetchProductShop(Request $request) {
+        $unavailableProducts = [];
+        $language = $request->language ? $request->language : DEFAULT_LANGUAGE;
+
+        $products_query = $this->repository->where('language', $language);
+
+        if (isset($request->date_range)) {
+            $dateRange = explode('//', $request->date_range);
+            $unavailableProducts = $this->repository->getUnavailableProducts($dateRange[0], $dateRange[1]);
+        }
+
+        if (in_array('variation_options.digital_files', explode(';', $request->with)) || in_array('digital_files', explode(';', $request->with))) {
+            throw new AuthorizationException(NOT_AUTHORIZED);
+        }
+
+        $products_query = $products_query->whereNotIn('id', $unavailableProducts);
+
+        if ($request->flash_sale_builder) {
+            $products_query = $this->repository->processFlashSaleProducts($request, $products_query);
+        }
+
+        if ($user = Auth::user()) {
+            $shop_ids = Shop::where('owner_id', $user->id)->pluck('id')->toArray();
+            $products_query = $products_query->whereIn('shop_id', $shop_ids);
+        }
+
+
+        return $products_query;
+    }
 
 
     /**

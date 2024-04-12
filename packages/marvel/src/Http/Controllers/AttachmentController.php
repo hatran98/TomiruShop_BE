@@ -45,23 +45,32 @@ class AttachmentController extends CoreController
     public function store(AttachmentRequest $request)
     {
         $urls = [];
+
         foreach ($request->attachment as $media) {
-            // Tạo một attachment mới
+            // Lưu tệp lên S3 và lấy URL
+            $originalFileName = 'media/' . uniqid() . '.' . $media->getClientOriginalExtension();
+            Storage::disk('another_bucket')->putFileAs('', $media, $originalFileName, 'public');
+            $originalUrl = Storage::disk('another_bucket')->url($originalFileName);
+
+            // Tạo attachment
             $attachment = new Attachment;
             $attachment->save();
 
-            // Lưu tệp gốc lên S3 và lấy URL
-            $originalFileName = 'media/' . time() . '.' . $media->getClientOriginalExtension();
-            Storage::disk('vultrobjects')->put($originalFileName, file_get_contents($media), 'public');
-            $originalUrl = Storage::disk('vultrobjects')->url($originalFileName);
+            // Tạo media từ URL và thêm vào attachment
+            $mediaItem = $attachment->addMediaFromUrl($originalUrl)->toMediaCollection();
 
-            // Tạo thumbnail từ hình ảnh gốc
-            $thumbnail = Image::make($media)->fit(100, 100)->encode();
-
-            // Lưu thumbnail lên S3 và lấy URL
-            $thumbnailFileName = 'media/thumbnails/' . time() . '.' . $media->getClientOriginalExtension();
-            Storage::disk('vultrobjects')->put($thumbnailFileName, $thumbnail->__toString(), 'public');
-            $thumbnailUrl = Storage::disk('vultrobjects')->url($thumbnailFileName);
+            // Kiểm tra xem tệp có phải là hình ảnh hay không
+            if (strpos($mediaItem->mime_type, 'image/') === 0) {
+                // Tạo thumbnail từ hình ảnh gốc
+                $thumbnail = Image::make($media)->fit(348, 232)->encode();
+                // Lưu thumbnail lên S3 và lấy URL
+                $thumbnailFileName = 'media/thumbnails/' . $attachment->id . '.' . $media->getClientOriginalExtension();
+                Storage::disk('another_bucket')->put($thumbnailFileName, $thumbnail->__toString(), 'public');
+                $thumbnailUrl = Storage::disk('another_bucket')->url($thumbnailFileName);
+            } else {
+                // Nếu không phải là hình ảnh, không tạo thumbnail
+                $thumbnailUrl = null;
+            }
 
             // Tạo mảng chứa URL và ID của tệp
             $converted_url = [
@@ -70,11 +79,12 @@ class AttachmentController extends CoreController
                 'id' => $attachment->id
             ];
 
+
             // Thêm vào mảng URLs
             $urls[] = $converted_url;
         }
 
-        return $urls;
+        return $urls; // Trả về mảng chứa các URL của các tệp đã lưu
     }
 
     /**

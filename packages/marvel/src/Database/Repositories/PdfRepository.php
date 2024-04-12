@@ -23,15 +23,16 @@ class PdfRepository
             return response()->json(['message' => 'OTP data not found'], 404);
         }
 
-        // Tạo và lưu PDF
-        $pdf = $this->createPdfWithPassword($card_serial, $otpData, $password);
 
-        if (!$pdf) {
-            return response()->json(['message' => 'PDF creation failed'], 500);
-        }
+        $user = $this->getUserEmail($card_serial);
+
+        $email = $user->email;
+
+        $user_name = $user->name;
 
 
-        $email = $this->getUserEmail($card_serial);
+        $pdf = $this->createPdfWithPassword($card_serial, $otpData, $password,$user_name);
+
 
         // Gửi email với PDF đính kèm
         if ($email) {
@@ -83,14 +84,14 @@ class PdfRepository
     }
 
 
-    public function createPdfWithPassword($card_serial, $otpData, $password)
+    public function createPdfWithPassword($card_serial, $otpData, $password,$user_name)
     {
         $options = new Options();
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isRemoteEnabled', true);
         $dompdf = new Dompdf($options);
 
-        $html = view('otp', compact('otpData'))->render();
+        $html = view('otp', compact('otpData','user_name','card_serial'))->render();
 
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'portrait');
@@ -110,32 +111,38 @@ class PdfRepository
     }
 
 
-    public function sendEmailWithPdf($email, $pdf, $card_serial)
+
+    public function sendEmailWithPdf($email, $pdf, $card_serial , $user_name)
     {
+
+
         $key = env('CREATE_TOKEN_KEY');
         $iv = env('CREATE_TOKEN_IV');
 
+        $endpoint = 'api/sendmail/pdf';
         if ($email) {
             $content = [
-                'serial' => $card_serial,
-                'email' => $email,
                 'subject' => 'Kích hoạt thẻ thành công',
-                'htmlBody' => 'Mã số thẻ : ' . $card_serial . ' đã được kích hoạt thành công </br> Vui lòng xem mã OTP của thẻ trong file pdf đính kém',
-                'attachment' => base64_encode($pdf),
+                'htmlBody' => [
+                    'title' => 'Thông Tin OTP Cho Thẻ Kích Hoạt',
+                    'email' => $email,
+                    'user_name' => $user_name,
+                    'serial' => $card_serial,
+                    'link' => $pdf,
+                ],
                 'type' => 'pdf',
                 'template' => 'pdf'
             ];
-
             $encryptToken = EncryptionHelper::encrypt($content, $key, $iv);
             $clientId = 'ha-dev.com';
-
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'clientId' => $clientId,
-                'clientSecret' => 'tomiruHaDong'
-            ])->post(env('API_SENDMAIL'), [
+                'client_id' => $clientId,
+                'secret' => 'tomiruHaDong'
+            ])->post(env('API_SENDMAIL') . $endpoint, [
                 'content' => $encryptToken,
             ]);
+
 
             if ($response->successful()) {
                 return true;

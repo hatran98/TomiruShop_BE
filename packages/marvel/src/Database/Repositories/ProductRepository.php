@@ -204,6 +204,9 @@ class ProductRepository extends BaseRepository
     {
 
         try {
+            if (!isset($request -> digital_files)){
+                $request -> merge(['is_digital' => false]);
+            }
             $data = $request->only($this->dataArray);
 
             $data['slug'] = $this->makeSlug($request);
@@ -490,13 +493,17 @@ class ProductRepository extends BaseRepository
                 }
             }
 
+            $tomxu = $data['tomxu'];
             $product->update($data);
+            $productTomxu = $product->tomxu()->update([
+                'price_tomxu' => $tomxu
+            ]);
             if ($product->product_type === ProductType::SIMPLE) {
                 $product->variations()->delete();
                 $product->variation_options()->delete();
             }
             $product->save();
-
+            $productTomxu->save();
             if (TRANSLATION_ENABLED) {
                 $this->where('sku', $product->sku)->where('id', '=',  $product->id)->update([
                     'price' => $product->price,
