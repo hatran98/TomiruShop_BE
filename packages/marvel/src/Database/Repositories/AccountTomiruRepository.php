@@ -18,7 +18,7 @@ class AccountTomiruRepository extends BaseRepository
         $decryptToken = (json_decode(base64_decode(str_replace('_', '/', str_replace('-','+',explode('.', $tokenApp)[1])))));
         if($decryptToken->sub !== null) {
             $tomiruUser = User::where('id', $decryptToken->sub)->first();
-            if (!$tomiruUser->jwt_token !== $tokenApp && !$tomiruUser->hash_token !== $hashTokenShop) {
+            if ($tomiruUser->jwt_token !== $tokenApp && $tomiruUser->hash_token !== $hashTokenShop) {
                 return response()->json(['error' => 'Missing required parameters'], 400);
             }
             if ($tomiruUser->jwt_token_shop === null) {
@@ -37,7 +37,7 @@ class AccountTomiruRepository extends BaseRepository
         $decryptToken = (json_decode(base64_decode(str_replace('_', '/', str_replace('-','+',explode('.', $tokenApp)[1])))));
         if($decryptToken->sub !== null) {
             $tomiruUser = User::where('id', $decryptToken->sub)->first();
-            if (!$tomiruUser->jwt_token !== $tokenApp) {
+            if ($tomiruUser->jwt_token !== $tokenApp) {
                 return response()->json(['error' => 'Missing required parameters'], 400);
             }
             if (!$tomiruUser->hasPermissionTo(Permission::CUSTOMER)) {
